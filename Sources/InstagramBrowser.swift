@@ -77,6 +77,6 @@ struct InstagramSignIn: View {
                 Button("Try again") { browser.connect() }.frame(minHeight:44)
                 Spacer()
             } else if let view = browser.webView { InstagramWebView(webView:view) }
-        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
+        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet()
     }
 }

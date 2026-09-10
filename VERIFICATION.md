@@ -1,10 +1,12 @@
 # Verification
 
-September 10, 2026. Porch **0.2 (4)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 10, 2026. Porch **0.2 (5)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
 
 ## Simulator regression
 
-The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-06-50--0400.xcresult`.
+The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-34-00--0400.xcresult`.
+
+Build 5 applies the user's sharp-corner rule to swatches, selection outlines, story avatars, play-button backgrounds and app sheets. Settings uses a plain header and confirmations appear inline. The introduction, largest-text introduction, expanded color settings, stories, sample conversation, clear-sign-in confirmation and fictional native composer were visually inspected. The existing UI journeys now also verify that cancelling sign-in clearing retains the session, and cancelling the unresolved-send confirmation preserves the draft and send block. Only fictional transport was used for sending checks. [Color settings screenshot](docs/images/color-settings.png).
 
 The color introduction journey verifies first launch without a web view, selecting Mist, continuing, changing to Lilac in Settings, persistence through restart, no repeated introduction, all five swatches at the largest accessibility text size and continuing with the default color. The introduction, colored sample feed and expanded Settings were visually inspected. An inherited accessibility identifier initially shadowed the Settings swatch identifiers; removing it and querying the visible disclosure label resolved the failed test. A duplicate selected-color label in expanded Settings was removed after visual review.
 
@@ -20,7 +22,7 @@ Native AVPlayer tests prove time progression with a generated local video, stopp
 
 ## Read-only Instagram integration
 
-On build 2, the opt-in PorchAccountCheck suite passed **2 tests**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-PorchAccountCheck-2026.09.10_12-47-40--0400.xcresult`. The color-only changes did not exercise the live account again.
+On build 2, the opt-in PorchAccountCheck suite passed **2 tests**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-PorchAccountCheck-2026.09.10_12-47-40--0400.xcresult`. The appearance changes did not exercise the live account again.
 
 The existing signed-in account returned **3 Following posts, 1 followed story group containing 1 media item, and 0 accepted inbox threads**, with no adapter error. A real Instagram video loaded as playable and advanced at least 0.75 seconds through AVPlayer's asynchronous time observer. This replaces the earlier unsuccessful synchronous playback probe; audio output is not established by this muted check.
 
@@ -34,7 +36,9 @@ Build 2 was signed, installed and launched on the paired iPhone 14 Pro Max. That
 
 Builds 3 and 4 were signed and installed on the same phone. Launch was refused because the phone was locked, so the new introduction has simulator interaction evidence only. The local install helper initially selected an XCTest runner left in the build directory. Its application selection was corrected and fixture-tested to exclude test runners and refuse ambiguous app products; the subsequent installs selected `dev.alex.porch` correctly.
 
-`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 4 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
+Build 5 was signed, installed and successfully launched on that iPhone. Its appearance was inspected in the simulator; no additional physical-device account or interaction checks were performed.
+
+`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 5 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
 
 ## Remaining acceptance
 

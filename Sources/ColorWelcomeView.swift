@@ -42,7 +42,7 @@ struct ColorChoices: View {
             HStack(spacing: 4) {
                 ForEach(PorchColor.allCases) { choice in
                     Button { selection = choice } label: {
-                        Circle().fill(choice.color).frame(width: 36, height: 36)
+                        Rectangle().fill(choice.color).frame(width: 36, height: 36)
                             .overlay {
                                 if selection == choice {
                                     Image(systemName: "checkmark").font(.system(size: 13, weight: .semibold))
@@ -50,7 +50,7 @@ struct ColorChoices: View {
                                 }
                             }
                             .padding(6)
-                            .overlay { Circle().stroke(selection == choice ? PorchTheme.bone : .clear, lineWidth: 1) }
+                            .overlay { Rectangle().stroke(selection == choice ? PorchTheme.bone : .clear, lineWidth: 1) }
                             .frame(maxWidth: .infinity, minHeight: 56).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityLabel(choice.name)
                         .accessibilityIdentifier("color-\(choice.rawValue)")

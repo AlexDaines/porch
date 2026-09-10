@@ -85,9 +85,45 @@ struct Avatar: View {
     var body: some View {
         Text(initials).font(.system(size: size * 0.28, weight: .medium, design: .monospaced))
             .foregroundStyle(PorchTheme.bone).frame(width: size, height: size)
-            .overlay(Circle().stroke(story ? PorchTheme.muted : PorchTheme.line, lineWidth: 1))
+            .overlay(Rectangle().stroke(story ? PorchTheme.muted : PorchTheme.line, lineWidth: 1))
     }
 }
 struct PorchRule: View {
     var body: some View { Rectangle().fill(PorchTheme.line).frame(height: 1).accessibilityHidden(true) }
+}
+
+extension View {
+    func porchSheet() -> some View {
+        self.presentationCornerRadius(0)
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(PorchTheme.canvas)
+            .preferredColorScheme(.dark)
+            .buttonStyle(.plain)
+    }
+}
+
+struct PorchConfirmation: View {
+    @Environment(\.porchAccent) private var accent
+    let title: String
+    let message: String
+    let actionTitle: String
+    var destructive = false
+    let confirm: () -> Void
+    let cancel: () -> Void
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
+            Text(message).font(.footnote).foregroundStyle(PorchTheme.muted)
+            ViewThatFits(in: .horizontal) {
+                HStack { actions }.fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 0) { actions }
+            }
+        }
+    }
+    @ViewBuilder private var actions: some View {
+        Button(actionTitle, role: destructive ? .destructive : nil, action: confirm)
+            .foregroundStyle(accent).frame(minWidth: 44, minHeight: 44, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+        Button("Cancel", action: cancel).foregroundStyle(PorchTheme.muted)
+            .frame(minWidth: 44, minHeight: 44).padding(.horizontal, 12)
+    }
 }

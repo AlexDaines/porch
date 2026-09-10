@@ -86,7 +86,7 @@ struct SampleStory: View {
                 }.buttonStyle(PorchButtonStyle(filled: false))
                     .accessibilityLabel(current == 3 ? "All done" : "Next story")
             }.padding(20)
-        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
+        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet()
     }
 }
 struct SampleInbox: View {
@@ -119,7 +119,7 @@ struct SampleInbox: View {
                 PorchRule()
                 Text(messages[selected ?? 0]).font(.body)
                 Eyebrow(text: "Sample · sending unavailable")
-            }.padding(20).presentationDetents([.medium]).presentationBackground(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
+            }.padding(20).presentationDetents([.medium]).porchSheet().foregroundStyle(PorchTheme.bone)
         }
     }
 }

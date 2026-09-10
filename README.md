@@ -14,7 +14,7 @@ Screenshots use fictional sample content. Signed-in verification is recorded sep
 
 ## UAT build
 
-- A quiet first-launch color choice: Sage, Sea, Mist, Lilac or Sand. Continue with the default or choose your own; Settings → Color changes it any time.
+- A quiet first-launch color choice: Sage, Sea, Mist, Lilac or Sand. Square swatches and sharp corners throughout Porch. Continue with the default or choose your own; Settings → Color changes it any time.
 - Native Following posts and carousels. Recognized ads, paid partnerships, Reels and recommendation modules are excluded before rendering. Authors must be positively identified as followed.
 - **Stories are separate from the feed.** Select a person, advance their stories yourself, then close. No timer or automatic transition to another person.
 - Videos have an explicit Play control. No autoplay.

@@ -115,7 +115,7 @@ struct NativeMedia: View {
                         if playback.state == .failed { Text("Couldn't play this video.").font(.subheadline).padding(8).background(PorchTheme.canvas) }
                         Button { playback.start(url) } label: {
                             Image(systemName: playback.state == .failed ? "arrow.clockwise" : "play.fill").font(.title2).padding(20)
-                                .background(PorchTheme.canvas.opacity(0.85), in: Circle())
+                                .background(PorchTheme.canvas.opacity(0.85), in: Rectangle())
                         }.accessibilityLabel(playback.state == .failed ? "Retry video" : "Play video")
                             .accessibilityHint(media.alt?.isEmpty == false ? media.alt! : "Video preview")
                     }

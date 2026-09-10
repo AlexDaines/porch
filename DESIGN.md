@@ -4,9 +4,11 @@ Porch serves people who already know Instagram and want less stimulation. Its co
 
 Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Content is left-aligned with 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
 
+Every Porch interface shape has sharp corners. Swatches, selection outlines, avatars, play-button backgrounds and message fields are rectangular. App sheets explicitly use a zero corner radius and no drag handle. Settings uses a plain header; confirmations appear inline with explicit confirm and cancel actions. This rule governs Porch's surfaces; Instagram authentication and OS-owned keyboards, sharing and playback controls retain their own rendering.
+
 ## Color introduction
 
-The first launch asks only “Choose a color.” Five named swatches, a selected checkmark and Continue sit on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
+The first launch asks only “Choose a color.” Five named square swatches, a selected checkmark and Continue sit on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
 
 | Choice | Accent |
 | --- | --- |

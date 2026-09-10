@@ -1,5 +1,7 @@
 # Working on Porch
 
+All Porch interface shapes have sharp corners. Color swatches and their selection outlines are squares, as are story avatars; media, buttons, text fields and presentation surfaces have no rounding. Use porchSheet() for app sheets, plain controls and inline confirmations. Do not introduce circles, capsules, rounded cards or default toolbar button backgrounds. Instagram's authentication page and OS-owned interfaces retain their own controls.
+
 Porch is a free, experimental native iOS Instagram client. Read DESIGN.md and VERIFICATION.md for the current architecture and evidence. The user explicitly replaced the earlier page-pruning approach with direct authenticated data requests and native rendering. Do not restore the browser-filter architecture.
 
 Use project.yml and XcodeGen. Sources/InstagramBrowser.swift is for sign-in only. Sources/InstagramTransport.swift owns the serialized empty local WebKit transport. Sources/InstagramDataClient.swift owns tab state and the send-attempt journal. Sources/Resources/instagram-data.js owns bounded reads and the single explicit text-send operation. NativeContent.swift and NativeStoriesAndMessages.swift own live content rendering. No Instagram application HTML or scripts should load for reading.

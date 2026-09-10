@@ -25,7 +25,7 @@ struct ContentView: View {
                 case .sample, .instagram: session
                 }
             }
-        }.foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent)
+        }.foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent).buttonStyle(.plain)
             .sheet(isPresented:$model.showSettings) { SettingsView(model:model,browser:browser,client:client,colorSelection:colorSelection) }
             .sheet(isPresented:$showSignIn,onDismiss:{
                 browser.suspend(); client.close()

@@ -15,7 +15,13 @@ struct SettingsView: View {
         return "Porch \(version) (\(build))\niOS \(UIDevice.current.systemVersion)\n\(client.diagnostic)"
     }
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Settings").font(.headline).accessibilityAddTraits(.isHeader).accessibilityIdentifier("settings-title")
+                Spacer()
+                Button("Done") { dismiss() }.frame(minWidth: 44, minHeight: 44).disabled(clearing)
+            }.padding(.horizontal, 20)
+            PorchRule()
             ScrollView {
                 VStack(alignment:.leading,spacing:18) {
                     if model.mode == .instagram {
@@ -44,20 +50,20 @@ struct SettingsView: View {
                     PorchRule()
                     Button("End session") { client.close(); browser.suspend(); model.mode = .welcome; dismiss() }
                         .frame(minHeight:44).accessibilityLabel("Finish session")
-                    Button(clearing ? "Clearing…" : "Clear sign-in") { confirmClear = true }
-                        .foregroundStyle(PorchTheme.muted).frame(minHeight:44).disabled(clearing).accessibilityIdentifier("clear-data")
-                }.padding(20)
-            }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
-                .navigationTitle("Settings").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement:.confirmationAction) { Button("Done") { dismiss() }.disabled(clearing) } }
-                .toolbarBackground(PorchTheme.canvas,for:.navigationBar).toolbarBackground(.visible,for:.navigationBar)
-                .interactiveDismissDisabled(clearing)
-                .confirmationDialog("Clear your Instagram sign-in?",isPresented:$confirmClear,titleVisibility:.visible) {
-                    Button("Clear website data",role:.destructive) {
-                        clearing = true; client.close(); client.clearJournal(); model.mode = .welcome
-                        Task { await browser.clearWebsiteData(); clearing = false; dismiss() }
+                    if confirmClear {
+                        PorchConfirmation(title: "Clear your Instagram sign-in?",
+                            message: "Signs you out of Porch and clears its website data.",
+                            actionTitle: "Clear website data", destructive: true, confirm: {
+                                confirmClear = false; clearing = true; client.close(); client.clearJournal(); model.mode = .welcome
+                                Task { await browser.clearWebsiteData(); clearing = false; dismiss() }
+                            }, cancel: { confirmClear = false })
+                    } else {
+                        Button(clearing ? "Clearing…" : "Clear sign-in") { confirmClear = true }
+                            .foregroundStyle(PorchTheme.muted).frame(minHeight:44).disabled(clearing).accessibilityIdentifier("clear-data")
                     }
-                } message: { Text("Signs you out of Porch and clears its website data.") }
-        }.presentationBackground(PorchTheme.canvas).preferredColorScheme(.dark).tint(accent)
+                }.padding(20)
+            }
+        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
+            .porchSheet().interactiveDismissDisabled(clearing).tint(accent)
     }
 }

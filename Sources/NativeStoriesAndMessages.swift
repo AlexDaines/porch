@@ -63,7 +63,7 @@ struct NativeStoryViewer: View {
                 }.padding(20).frame(minHeight:geometry.size.height)
             }
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
-            .preferredColorScheme(.dark).presentationBackground(PorchTheme.canvas)
+            .porchSheet()
             .task(id:retry) {
                 loading = true; error = nil
                 do { let result = try await client.request("story",identifier:person.id); items = result.posts; error = result.error }
@@ -153,18 +153,26 @@ struct NativeConversation: View {
             }
             VStack(alignment:.leading,spacing:8) {
                 if unconfirmed {
-                    Text(LoadFailure.message("sendUnconfirmed")).font(.footnote).foregroundStyle(PorchTheme.muted)
-                    HStack {
-                        Button("Check conversation") { Task { await load() } }.disabled(loading)
-                        Spacer()
-                        Button("I checked") { confirmUnlock = true }
-                    }.font(.footnote).frame(minHeight:44)
+                    if confirmUnlock {
+                        PorchConfirmation(title: "Allow another message?",
+                            message: "The previous message may have arrived. This clears the warning and draft; it does not resend anything.",
+                            actionTitle: "Allow another message", confirm: {
+                                client.resolveSend(thread.id); draft = ""; sendError = nil; confirmUnlock = false
+                            }, cancel: { confirmUnlock = false })
+                    } else {
+                        Text(LoadFailure.message("sendUnconfirmed")).font(.footnote).foregroundStyle(PorchTheme.muted)
+                        HStack {
+                            Button("Check conversation") { Task { await load() } }.disabled(loading)
+                            Spacer()
+                            Button("I checked") { confirmUnlock = true }
+                        }.font(.footnote).frame(minHeight:44)
+                    }
                 } else if let sendError {
                     Text(LoadFailure.message(sendError)).font(.footnote).foregroundStyle(PorchTheme.muted)
                 } else if sent { Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).accessibilityIdentifier("message-sent") }
                 HStack(alignment:.bottom,spacing:12) {
                     TextField("Message",text:$draft,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(.body).lineLimit(1...4)
-                        .padding(12).background(PorchTheme.surface).accessibilityIdentifier("message-draft")
+                        .textFieldStyle(.plain).padding(12).background(PorchTheme.surface).accessibilityIdentifier("message-draft")
                     Button {
                         let text = draft
                         sent = false; sendError = nil
@@ -186,10 +194,7 @@ struct NativeConversation: View {
                 if draft.utf16.count > 1000 { Text("Up to 1,000 characters.").font(.footnote).foregroundStyle(PorchTheme.muted) }
             }.padding(16)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
-            .presentationBackground(PorchTheme.canvas).interactiveDismissDisabled(sending)
-            .confirmationDialog("Allow another message?",isPresented:$confirmUnlock,titleVisibility:.visible) {
-                Button("Allow another message") { client.resolveSend(thread.id); draft = ""; sendError = nil }
-            } message: { Text("The previous message may have arrived. This clears the warning and draft; it does not resend anything.") }
+            .porchSheet().interactiveDismissDisabled(sending)
             .onChange(of:draft) { _, value in client.keepDraft(value,for:thread.id) }
             .task { draft = client.drafts[thread.id] ?? ""; await load() }
     }
