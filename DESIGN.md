@@ -1,8 +1,24 @@
 # Design
 
-Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and lime for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
+Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and a personal accent for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
 
-Monospaced utility labels and the short lime selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Content is left-aligned with 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
+Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Content is left-aligned with 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
+
+## Color introduction
+
+The first launch asks only “Choose a color.” Five named swatches, a selected checkmark and Continue sit on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
+
+| Choice | Accent |
+| --- | --- |
+| Sage | `#A6B8A0` |
+| Sea | `#94B8B1` |
+| Mist | `#9FB7C7` |
+| Lilac | `#B5ADC6` |
+| Sand | `#C6BDAA` |
+
+These are design choices informed by research, not validated therapeutic colors. [Wilms and Oberfeld](https://doi.org/10.1007/s00426-017-0880-8) found that saturation and brightness, as well as hue, affected arousal in their display experiment; blue and green elicited lower arousal ratings than red. That finding informs the muted blue/green options, but does not validate these exact hex values or establish addiction outcomes. Lilac and Sand broaden personal preference. [Jonauskaite and colleagues](https://doi.org/10.1177/0956797620948810) found shared color-emotion associations alongside linguistic/geographic differences. The interface makes no universal calming claim.
+
+Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised surface. Color is accompanied by labels and a checkmark, with a minimum 48 × 56-point swatch target. The page scrolls when larger text needs more room. Existing reading layout and original media colors remain intact.
 
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
 

@@ -4,6 +4,8 @@ September 10, 2026.
 
 Porch has no server, analytics, crash-reporting SDK, payment system, or separate account.
 
+The introductory color choice and its completion are saved in local app preferences. The introduction makes no Instagram requests. Changing the color uses no network service or tracking. These appearance preferences remain when you clear Instagram sign-in and may be included in normal device backups.
+
 You sign in on Instagram's own HTTPS page inside Apple's WebKit. Passwords are entered into that page, not a native Porch form. WebKit stores the session locally. Porch does not extract or export the session cookie.
 
 A separate empty local WebKit document uses that same session for reads and user-initiated text messages. The bundled adapter reads the CSRF cookie inside WebKit for request authentication and the local account ID for message alignment. Those values stay inside WebKit. It returns bounded post, story, inbox and message models to native memory for SwiftUI to display. Content is not logged, exported, or sent to a Porch backend.

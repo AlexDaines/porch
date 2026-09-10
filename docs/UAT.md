@@ -10,6 +10,8 @@ This build is for testing the native reading and messaging flows. It is not a cl
 
 ## Friend testing journey
 
+On first launch, choose a color or continue with Sage. Reopen Porch and confirm the introduction stays completed. In Settings → Color, change the accent and check it remains selected after restarting.
+
 1. Sign in through Instagram. Close and reopen Porch, then use Open Instagram without re-entering credentials. Clear sign-in when finished; that removes local session data.
 2. Open Feed. Check that it contains followed posts and has no story tray, Reels or suggested modules. Swipe a carousel. Tap Play on a video; backgrounding or leaving the view should stop it.
 3. Open Stories. Choose a person, advance and close manually. Stories should not advance themselves or reveal Feed underneath the content area.

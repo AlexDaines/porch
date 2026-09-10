@@ -2,9 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.porchAccent) private var accent
     @ObservedObject var model: PorchModel
     @ObservedObject var browser: InstagramBrowser
     @ObservedObject var client: InstagramDataClient
+    @Binding var colorSelection: PorchColor
     @State private var confirmClear = false
     @State private var clearing = false
     private var diagnosticReport: String {
@@ -18,6 +20,15 @@ struct SettingsView: View {
                 VStack(alignment:.leading,spacing:18) {
                     if model.mode == .instagram {
                         Button("Reload") { Task { await client.load(model.tab, refresh: true) }; dismiss() }.frame(minHeight:44)
+                    }
+                    DisclosureGroup {
+                        ColorChoices(selection: $colorSelection, showsName: false).padding(.top, 12)
+                    } label: {
+                        HStack {
+                            Text("Color")
+                            Spacer()
+                            Text(colorSelection.name).foregroundStyle(PorchTheme.muted)
+                        }.frame(minHeight: 44)
                     }
                     DisclosureGroup("About") {
                         VStack(alignment:.leading,spacing:16) {
@@ -47,6 +58,6 @@ struct SettingsView: View {
                         Task { await browser.clearWebsiteData(); clearing = false; dismiss() }
                     }
                 } message: { Text("Signs you out of Porch and clears its website data.") }
-        }.presentationBackground(PorchTheme.canvas).preferredColorScheme(.dark).tint(PorchTheme.accent)
+        }.presentationBackground(PorchTheme.canvas).preferredColorScheme(.dark).tint(accent)
     }
 }

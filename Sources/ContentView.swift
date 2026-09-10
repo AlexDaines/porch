@@ -5,18 +5,28 @@ struct ContentView: View {
     @StateObject private var browser = InstagramBrowser()
     @StateObject private var client = InstagramDataClient.appClient()
     @State private var showSignIn = false
+    @AppStorage("porch.appearance.color", store: AppearancePreferences.store) private var colorName = PorchColor.sage.rawValue
+    @AppStorage("porch.appearance.introComplete", store: AppearancePreferences.store) private var introComplete = false
+    private var colorSelection: Binding<PorchColor> {
+        Binding(get: { PorchColor(rawValue: colorName) ?? .sage }, set: { colorName = $0.rawValue })
+    }
+    private var accent: Color { colorSelection.wrappedValue.color }
     private var nativeTab: PorchModel.Tab? { model.mode == .instagram ? model.tab : nil }
 
     var body: some View {
         ZStack {
             PorchTheme.canvas.ignoresSafeArea()
-            switch model.mode {
-            case .welcome, .finished:
-                WelcomeView(connect:connect,sample:{ model.mode = .sample; model.tab = .feed })
-            case .sample, .instagram: session
+            if !introComplete && !AppearancePreferences.bypassIntro {
+                ColorWelcomeView(selection: colorSelection) { introComplete = true }
+            } else {
+                switch model.mode {
+                case .welcome, .finished:
+                    WelcomeView(connect:connect,sample:{ model.mode = .sample; model.tab = .feed })
+                case .sample, .instagram: session
+                }
             }
-        }.foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(PorchTheme.accent)
-            .sheet(isPresented:$model.showSettings) { SettingsView(model:model,browser:browser,client:client) }
+        }.foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent)
+            .sheet(isPresented:$model.showSettings) { SettingsView(model:model,browser:browser,client:client,colorSelection:colorSelection) }
             .sheet(isPresented:$showSignIn,onDismiss:{
                 browser.suspend(); client.close()
                 if model.mode == .instagram { Task { await client.load(model.tab) } }
@@ -33,6 +43,7 @@ struct ContentView: View {
                 if ProcessInfo.processInfo.arguments.contains("--native") { connect() }
                 if ProcessInfo.processInfo.arguments.contains("--sign-in") { signIn() }
             }
+            .environment(\.porchAccent, accent)
     }
     private var session: some View {
         VStack(spacing:0) {
@@ -61,12 +72,12 @@ struct ContentView: View {
         ForEach([PorchModel.Tab.feed,.stories,.messages],id:\.self) { tab in
             Button { model.tab = tab } label: {
                 Text(tab.rawValue.uppercased()).font(PorchTheme.utility).tracking(0.8)
-                    .foregroundStyle(model.tab == tab ? PorchTheme.accent : PorchTheme.muted)
+                    .foregroundStyle(model.tab == tab ? accent : PorchTheme.muted)
                     .fixedSize(horizontal:true,vertical:false)
                     .frame(minWidth:44,minHeight:44,alignment:.leading)
                     .padding(.bottom,4)
                     .overlay(alignment:.bottomLeading) {
-                        if model.tab == tab { Rectangle().fill(PorchTheme.accent).frame(width:32,height:2) }
+                        if model.tab == tab { Rectangle().fill(accent).frame(width:32,height:2) }
                     }
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel(tab.rawValue)

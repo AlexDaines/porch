@@ -21,6 +21,7 @@ struct SampleLandscape: View {
     }
 }
 struct SampleFeed: View {
+    @Environment(\.porchAccent) private var accent
     let finish: () -> Void
     var body: some View {
         ScrollView {
@@ -36,7 +37,7 @@ struct SampleFeed: View {
                 HStack {
                     Eyebrow(text: "Caught up")
                     Spacer()
-                    Button("END", action: finish).font(PorchTheme.utility).foregroundStyle(PorchTheme.accent)
+                    Button("END", action: finish).font(PorchTheme.utility).foregroundStyle(accent)
                         .frame(minWidth: 44, minHeight: 44, alignment: .trailing).accessibilityLabel("Finish session")
                 }.padding(.horizontal, 20).padding(.top, 8)
             }
@@ -64,6 +65,7 @@ struct SampleStories: View {
     }
 }
 struct SampleStory: View {
+    @Environment(\.porchAccent) private var accent
     @Environment(\.dismiss) private var dismiss
     @State private var current: Int
     init(start: Int) { _current = State(initialValue: start) }
@@ -75,7 +77,7 @@ struct SampleStory: View {
                     Spacer()
                     Eyebrow(text: "Sample · \(current + 1)/4")
                     Button("CLOSE") { dismiss() }.font(PorchTheme.utility).frame(minWidth: 44, minHeight: 44)
-                        .foregroundStyle(PorchTheme.accent).accessibilityLabel("Close")
+                        .foregroundStyle(accent).accessibilityLabel("Close")
                 }
                 SampleLandscape(height: 400)
                 Text(["Somewhere with no agenda.", "A good day to take the scenic route.", "Wish you were here.", "See you when we're back."][current]).font(.body)
@@ -88,6 +90,7 @@ struct SampleStory: View {
     }
 }
 struct SampleInbox: View {
+    @Environment(\.porchAccent) private var accent
     @State private var selected: Int?
     private let messages = ["Coffee on Sunday?", "That looks like a good detour.", "Made it home. Thank you for today."]
     var body: some View {
@@ -111,7 +114,7 @@ struct SampleInbox: View {
                 HStack {
                     Text(SampleContent.names[selected ?? 0]).font(.headline)
                     Spacer()
-                    Button("CLOSE") { selected = nil }.font(PorchTheme.utility).foregroundStyle(PorchTheme.accent).frame(minHeight: 44)
+                    Button("CLOSE") { selected = nil }.font(PorchTheme.utility).foregroundStyle(accent).frame(minHeight: 44)
                 }
                 PorchRule()
                 Text(messages[selected ?? 0]).font(.body)

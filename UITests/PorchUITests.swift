@@ -1,6 +1,52 @@
 import XCTest
 
 final class PorchUITests: XCTestCase {
+    @MainActor func testColorIntroductionAndSettingsPersistAcrossLaunches() {
+        let app = XCUIApplication()
+        continueAfterFailure = false
+        app.launchArguments = ["--appearance-fixture", "--reset-appearance"]
+        app.launch()
+        XCTAssertTrue(app.buttons["color-continue"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.webViews.count, 0)
+        XCTAssertTrue(app.buttons["color-sage"].isSelected)
+        capture(app, "Color introduction")
+        app.buttons["color-mist"].tap()
+        XCTAssertTrue(app.buttons["color-mist"].isSelected)
+        app.buttons["color-continue"].tap()
+        XCTAssertTrue(app.buttons["connect"].waitForExistence(timeout: 3))
+        app.buttons["sample"].tap()
+        capture(app, "Mist sample feed")
+        app.buttons["settings"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Color,")).firstMatch.tap()
+        XCTAssertTrue(app.buttons["color-mist"].isSelected)
+        app.buttons["color-lilac"].tap()
+        XCTAssertTrue(app.buttons["color-lilac"].isSelected)
+        capture(app, "Color settings")
+
+        app.terminate()
+        app.launchArguments = ["--appearance-fixture"]
+        app.launch()
+        XCTAssertTrue(app.buttons["connect"].waitForExistence(timeout: 10), "The introduction must only appear once")
+        XCTAssertFalse(app.buttons["color-continue"].exists)
+        app.buttons["sample"].tap()
+        app.buttons["settings"].tap()
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Color,")).firstMatch.tap()
+        XCTAssertTrue(app.buttons["color-lilac"].isSelected, "Settings changes must survive restart")
+
+        app.terminate()
+        app.launchArguments = ["--appearance-fixture", "--reset-appearance", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["color-continue"].waitForExistence(timeout: 10))
+        for name in ["sage", "sea", "mist", "lilac", "sand"] {
+            XCTAssertTrue(app.buttons["color-\(name)"].isHittable)
+        }
+        if !app.buttons["color-continue"].isHittable { app.swipeUp() }
+        XCTAssertTrue(app.buttons["color-continue"].isHittable)
+        capture(app, "Large text color introduction")
+        app.buttons["color-continue"].tap()
+        XCTAssertTrue(app.buttons["connect"].waitForExistence(timeout: 3), "Continuing with the default color must work")
+    }
+
     @MainActor func testSampleNavigationAndFinish() {
         let app = XCUIApplication()
         continueAfterFailure = false

@@ -104,6 +104,7 @@ struct NativeInbox: View {
 }
 
 struct NativeConversation: View {
+    @Environment(\.porchAccent) private var accent
     let thread: InstagramThread
     @ObservedObject var client: InstagramDataClient
     @Environment(\.dismiss) private var dismiss
@@ -179,7 +180,7 @@ struct NativeConversation: View {
                         if sending { ProgressView().frame(width:44,height:44) }
                         else { Image(systemName:"arrow.up").font(.body.weight(.semibold)).frame(width:44,height:44) }
                     }.disabled(!validDraft || sending || unconfirmed || loading || error != nil)
-                        .foregroundStyle(validDraft && !sending && !unconfirmed && !loading && error == nil ? PorchTheme.accent : PorchTheme.muted)
+                        .foregroundStyle(validDraft && !sending && !unconfirmed && !loading && error == nil ? accent : PorchTheme.muted)
                         .accessibilityLabel("Send message").accessibilityIdentifier("send-message")
                 }
                 if draft.utf16.count > 1000 { Text("Up to 1,000 characters.").font(.footnote).foregroundStyle(PorchTheme.muted) }

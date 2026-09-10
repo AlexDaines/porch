@@ -5,9 +5,8 @@ A quiet, free, open-source Instagram client for iOS. Native views, a black canva
 There is no subscription, Porch account, backend, advertising, or app analytics.
 
 <p>
+  <img src="docs/images/color-introduction.png" width="240" alt="A minimal first-launch choice of five muted accent colors">
   <img src="docs/images/sample-feed.png" width="240" alt="Porch's fictional sample feed">
-  <img src="docs/images/sample-stories.png" width="240" alt="Stories occupy their own screen">
-  <img src="docs/images/sample-messages.png" width="240" alt="Porch's fictional sample inbox">
   <img src="docs/images/fictional-composer.png" width="240" alt="The native DM composer using a fictional test conversation">
 </p>
 
@@ -15,6 +14,7 @@ Screenshots use fictional sample content. Signed-in verification is recorded sep
 
 ## UAT build
 
+- A quiet first-launch color choice: Sage, Sea, Mist, Lilac or Sand. Continue with the default or choose your own; Settings → Color changes it any time.
 - Native Following posts and carousels. Recognized ads, paid partnerships, Reels and recommendation modules are excluded before rendering. Authors must be positively identified as followed.
 - **Stories are separate from the feed.** Select a person, advance their stories yourself, then close. No timer or automatic transition to another person.
 - Videos have an explicit Play control. No autoplay.
