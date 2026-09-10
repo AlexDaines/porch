@@ -8,21 +8,22 @@ There is no subscription, Porch account, backend, advertising, or app analytics.
   <img src="docs/images/sample-feed.png" width="240" alt="Porch's fictional sample feed">
   <img src="docs/images/sample-stories.png" width="240" alt="Stories occupy their own screen">
   <img src="docs/images/sample-messages.png" width="240" alt="Porch's fictional sample inbox">
+  <img src="docs/images/fictional-composer.png" width="240" alt="The native DM composer using a fictional test conversation">
 </p>
 
 Screenshots use fictional sample content. Signed-in verification is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
-## What works
+## UAT build
 
 - Native Following posts and carousels. Recognized ads, paid partnerships, Reels and recommendation modules are excluded before rendering. Authors must be positively identified as followed.
 - **Stories are separate from the feed.** Select a person, advance their stories yourself, then close. No timer or automatic transition to another person.
 - Videos have an explicit Play control. No autoplay.
-- The accepted inbox and recent text messages are readable in native views. No message requests, composer, sending, likes, follows, or posting. Non-text messages currently display “Attachment.”
-- More posts load only when requested. Switching tabs reuses in-memory content; Settings → Reload refreshes it.
+- Read accepted conversations, load earlier messages and send text from a native composer. Sending requires an acknowledgement; uncertain sends stay visibly unresolved and cannot retry automatically. Non-text attachments have descriptive placeholders. No message requests, likes, follows or posting.
+- Posts, older conversations and earlier messages load only when requested. Pull to refresh or use Settings → Reload. Failed refreshes preserve loaded content. Each session holds at most 200 posts/conversations/messages per relevant view.
 - Sign in through Instagram's own page. End a session to close content; Clear sign-in removes the local website data and shared media-response cache.
 - A fully offline sample needs no Instagram account.
 
-This is an **experimental source release**. Video asset loading is verified; playback hit a simulator audio stall and still needs device verification. Instagram's unofficial data routes can change or reject requests. Following means accounts you follow, not necessarily personal friends. Unknown content can be omitted; the adapter does not guarantee complete coverage. It does not block the separate Instagram app. There is no App Store release.
+This is an **experimental source release**. Native playback progression is verified in the simulator with both a local fixture and a real Instagram video. Live DM delivery and physical-device acceptance still require verification before friend UAT. Instagram's unofficial data routes can change or reject requests. Following means accounts you follow, not necessarily personal friends. Unknown content can be omitted; the adapter does not guarantee complete coverage. It does not block the separate Instagram app. There is no App Store release.
 
 ## How it works
 
@@ -48,6 +49,12 @@ xcodebuild -project Porch.xcodeproj -scheme Porch \
 ```
 
 The default suite uses fictional fixtures and a nonpersistent WebKit store. `PorchLiveCheck` is an opt-in signed-out login-page check. `PorchAccountCheck` is an opt-in read-only integration check that requires an existing signed-in account with a Following post and an active story. It retains private screenshots in the local Xcode result bundle; never publish those results.
+
+## Preparing the UAT build
+
+Run `bash tools/build-uat.sh` to produce an unsigned **Release** archive at `.build-uat/Porch.xcarchive`. Signing and installation use the operator's existing distribution workflow. Debug fixture transport is excluded from Release. No TestFlight or App Store submission is made by this script.
+
+The [UAT guide](docs/UAT.md) describes the checks and remaining acceptance gates. Settings → Share diagnostic details includes version and request status without account content. CI runs only offline fixtures and a device Release compilation; live account checks are opt-in.
 
 ## Project commitment
 

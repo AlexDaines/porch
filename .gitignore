@@ -9,3 +9,8 @@ test-results/
 *.xcresult/
 artifacts/private/
 artifacts/test-pass-*/
+
+.build-device/
+.build-uat/
+*.xcarchive/
+*.ipa

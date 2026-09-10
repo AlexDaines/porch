@@ -9,6 +9,7 @@ struct InstagramPost: Decodable, Identifiable {
         let height: Double
         let video: String?
         let isVideo: Bool?
+        var alt: String? = nil
         var imageURL: URL? { Self.mediaURL(url) }
         var videoURL: URL? { video.flatMap(Self.mediaURL) }
         static func mediaURL(_ string: String) -> URL? {
@@ -29,6 +30,10 @@ struct NativeFeed: View {
     let posts: [InstagramPost]
     var hasMore = false
     var more: (() -> Void)?
+    var moreLoading = false
+    var moreError: String?
+    var reachedSessionLimit = false
+    var refresh: (() async -> Void)?
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 24) {
@@ -36,14 +41,20 @@ struct NativeFeed: View {
                 if posts.isEmpty {
                     Text("No posts.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top, 40)
                 }
+                if let moreError, let more, moreError != "signIn" {
+                    LoadFailure(code:moreError,retry:{
+                        if ["unavailable","unsupported"].contains(moreError) { Task { await refresh?() } } else { more() }
+                    },actionTitle:["unavailable","unsupported"].contains(moreError) ? "RELOAD FEED" : nil)
+                }
+                if moreLoading { ProgressView().accessibilityLabel("Loading more posts") }
                 if hasMore, let more {
-                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.8).frame(minHeight:44).padding(.vertical,16)
+                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.8).frame(minHeight:44).padding(.vertical,16).disabled(moreLoading)
                 } else if !posts.isEmpty {
-                    Eyebrow(text:"Caught up").padding(.vertical, 24)
+                    Eyebrow(text:reachedSessionLimit ? "Session limit reached. Reload to start again." : "No more posts").padding(.vertical, 24)
                 }
             }
         }.scrollIndicators(.hidden).background(PorchTheme.canvas)
-            .accessibilityIdentifier("native-feed")
+            .accessibilityIdentifier("native-feed").refreshable { await refresh?() }
     }
 }
 
@@ -88,46 +99,53 @@ struct NativePostCard: View {
 struct NativeMedia: View {
     let media: InstagramPost.Media
     var active = true
-    @State private var player: AVPlayer?
+    var maxHeight: CGFloat = 420
+    @StateObject private var playback = MediaPlayback()
     @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         ZStack {
-            if let player {
-                VideoPlayer(player: player).frame(height: 380)
-                    .accessibilityLabel("Video player")
+            if let player = playback.player {
+                VideoPlayer(player: player).frame(height: maxHeight)
+                    .accessibilityLabel("Video player").accessibilityIdentifier("video-player")
+                if playback.state == .loading { ProgressView().padding(20).background(PorchTheme.canvas).accessibilityLabel("Loading video") }
             } else {
-                NativePostImage(media: media)
+                NativePostImage(media: media, maxHeight: maxHeight)
                 if let url = media.videoURL {
-                    Button {
-                        let next = AVPlayer(url: url)
-                        player = next
-                        next.play()
-                    } label: {
-                        Image(systemName: "play.fill").font(.title2).padding(20)
-                            .background(PorchTheme.canvas.opacity(0.85), in: Circle())
-                    }.accessibilityLabel("Play video")
+                    VStack(spacing: 12) {
+                        if playback.state == .failed { Text("Couldn't play this video.").font(.subheadline).padding(8).background(PorchTheme.canvas) }
+                        Button { playback.start(url) } label: {
+                            Image(systemName: playback.state == .failed ? "arrow.clockwise" : "play.fill").font(.title2).padding(20)
+                                .background(PorchTheme.canvas.opacity(0.85), in: Circle())
+                        }.accessibilityLabel(playback.state == .failed ? "Retry video" : "Play video")
+                            .accessibilityHint(media.alt?.isEmpty == false ? media.alt! : "Video preview")
+                    }
                 } else if media.isVideo == true {
                     Text("Video unavailable").font(.caption).padding(10).background(PorchTheme.canvas)
                 }
             }
         }
-        .onDisappear { stop() }
-        .onChange(of: active) { _, value in if !value { stop() } }
-        .onChange(of: scenePhase) { _, value in if value != .active { stop() } }
+        .onDisappear { playback.stop() }
+        .onChange(of: active) { _, value in if !value { playback.stop() } }
+        .onChange(of: scenePhase) { _, value in if value != .active { playback.stop() } }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { _ in playback.stop() }
     }
-    private func stop() { player?.pause(); player = nil }
 }
 
 struct NativePostImage: View {
     let media: InstagramPost.Media
+    var maxHeight: CGFloat = 420
+    @State private var retry = UUID()
     var body: some View {
         AsyncImage(url: media.imageURL) { phase in
             switch phase {
-            case .success(let image): image.resizable().scaledToFit()
-            case .failure: Image(systemName: "photo").foregroundStyle(PorchTheme.muted).frame(maxWidth: .infinity, minHeight: 180)
+            case .success(let image):
+                image.resizable().scaledToFit().accessibilityLabel(media.alt?.isEmpty == false ? media.alt! : "Post photo")
+                    .accessibilityIdentifier("native-post-image").accessibilityAddTraits(.isImage)
+            case .failure:
+                Button { retry = UUID() } label: { Label("Reload photo",systemImage:"arrow.clockwise").font(PorchTheme.utility).frame(maxWidth:.infinity,minHeight:180) }
             default: ProgressView().frame(maxWidth: .infinity, minHeight: 180)
             }
-        }.frame(maxWidth: .infinity, maxHeight: 420)
-            .accessibilityLabel("Post photo").accessibilityIdentifier("native-post-image")
+        }.id(retry).frame(maxWidth: .infinity, maxHeight: maxHeight)
+
     }
 }

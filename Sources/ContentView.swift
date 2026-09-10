@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var model = PorchModel()
     @StateObject private var browser = InstagramBrowser()
-    @StateObject private var client = InstagramDataClient()
+    @StateObject private var client = InstagramDataClient.appClient()
     @State private var showSignIn = false
     private var nativeTab: PorchModel.Tab? { model.mode == .instagram ? model.tab : nil }
 
@@ -83,23 +83,25 @@ struct ContentView: View {
         }
     }
     @ViewBuilder private var liveContent: some View {
-        if let error = client.error {
-            VStack(spacing:20) {
-                Text(error == "signIn" ? "Sign in to Instagram." : error == "rateLimited" ? "Try again in a little while." : "Couldn't load this view.")
-                    .font(.subheadline).foregroundStyle(PorchTheme.muted)
-                Button(error == "signIn" ? "Sign in" : "Try again") {
-                    if error == "signIn" { signIn() } else { Task { await client.load(model.tab, refresh: true) } }
-                }.font(.subheadline).frame(minHeight:44)
-            }.frame(maxWidth:.infinity,maxHeight:.infinity)
-        } else {
-            ZStack {
-                switch model.tab {
-                case .stories: NativeStories(people:client.stories,client:client)
-                case .messages: NativeInbox(threads:client.threads,client:client)
-                default: NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ Task { await client.morePosts() } })
+        VStack(spacing:0) {
+            if let error = client.error {
+                LoadFailure(code:error) {
+                    if error == "signIn" { signIn() } else { Task { await client.load(model.tab,refresh:true) } }
                 }
-                if client.loading { ProgressView().padding(16).background(PorchTheme.canvas) }
             }
+            if client.error == nil || client.hasLoadedCurrentTab {
+                ZStack {
+                    switch model.tab {
+                    case .stories: NativeStories(people:client.stories,client:client)
+                    case .messages: NativeInbox(threads:client.threads,client:client)
+                    case .feed:
+                        NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ Task { await client.morePosts() } },
+                            moreLoading:client.moreLoading,moreError:client.moreError,reachedSessionLimit:client.reachedSessionLimit,
+                            refresh:{ await client.load(.feed,refresh:true) })
+                    }
+                    if client.loading && !client.hasLoadedCurrentTab { ProgressView().padding(16).background(PorchTheme.canvas) }
+                }
+            } else { Spacer() }
         }
     }
     private func connect() { model.tab = .feed; model.mode = .instagram }

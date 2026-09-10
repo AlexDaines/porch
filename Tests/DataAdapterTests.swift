@@ -99,6 +99,72 @@ final class DataAdapterTests: XCTestCase {
         XCTAssertEqual(observed5, 0, "The document must not load Instagram application scripts")
     }
 
+    func testTextSendIsExplicitBoundedAndRequiresServerAcknowledgement() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'csrftoken=fixture-csrf; path=/';
+        globalThis.pages = [
+          {inbox:{threads:[{thread_id:'21',items:[]}]}},
+          {thread:{items:[]}},
+          {status:'ok',payload:{item_id:'server-item'}},
+          {status:'ok'},
+          {__http:429}
+        ];
+        """#)
+        let beforeOpen = try await harness.request("sendText",identifier:"21",message:"Hello")
+        XCTAssertEqual(beforeOpen.error,"invalidMessage")
+        _ = try await harness.request("inbox")
+        _ = try await harness.request("thread",identifier:"21")
+        let tooLong = try await harness.request("sendText",identifier:"21",message:String(repeating:"a",count:1001))
+        XCTAssertEqual(tooLong.error,"invalidMessage")
+        let sent = try await harness.request("sendText",identifier:"21",message:"Hello & goodbye + 🙂")
+        XCTAssertNil(sent.error)
+        XCTAssertEqual(sent.sentItemID,"server-item")
+        let repeated = try await harness.request("sendText",identifier:"21",message:"Hello & goodbye + 🙂")
+        XCTAssertEqual(repeated.sentItemID,"server-item")
+        let body = try await harness.script("return new URLSearchParams(calls[2].options.body).get('text');") as? String
+        XCTAssertEqual(body,"Hello & goodbye + 🙂")
+        let count = try await harness.script("return calls.length;") as? Int
+        XCTAssertEqual(count,3)
+        let method = try await harness.script("return calls[2].options.method;") as? String
+        XCTAssertEqual(method,"POST")
+        let uncertain = try await harness.request("sendText",identifier:"21",message:"Another",context:"2234567890123456789")
+        XCTAssertEqual(uncertain.error,"sendUnconfirmed")
+        let limited = try await harness.request("sendText",identifier:"21",message:"Another",context:"3234567890123456789")
+        XCTAssertEqual(limited.error,"rateLimited")
+        XCTAssertEqual(limited.retryAfterSeconds,60)
+    }
+
+    func testConversationPaginationUsesExplicitCursorsAndKeepsRecipientMembership() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'ds_user_id=7; path=/';
+        globalThis.pages = [
+          {inbox:{threads:[{thread_id:'21'}],oldest_cursor:'next inbox',has_older:true}},
+          {inbox:{threads:[{thread_id:'22'}],has_older:false}},
+          {thread:{users:[{pk:8,username:'friend'}],items:[{item_id:'b',text:'New',user_id:8}],oldest_cursor:'older messages',has_older:true}},
+          {thread:{items:[{item_id:'a',text:'Old',user_id:7}],has_older:false}}
+        ];
+        """#)
+        let inbox = try await harness.request("inbox")
+        XCTAssertTrue(inbox.hasMore)
+        let more = try await harness.request("moreInbox")
+        XCTAssertEqual(more.threads.map(\.id),["22"])
+        XCTAssertFalse(more.hasMore)
+        let thread = try await harness.request("thread",identifier:"21")
+        XCTAssertEqual(thread.messages.first?.sender,"friend")
+        XCTAssertTrue(thread.hasMore)
+        let old = try await harness.request("olderMessages",identifier:"21")
+        XCTAssertEqual(old.messages.first?.text,"Old")
+        XCTAssertTrue(old.messages.first?.mine == true)
+        XCTAssertFalse(old.hasMore)
+        let paths = try await harness.script("return calls.map(c=>c.path);") as? [String]
+        XCTAssertTrue(paths?[1].contains("cursor=next%20inbox") == true)
+        XCTAssertTrue(paths?[3].contains("cursor=older%20messages") == true)
+    }
+
     func testNativeMediaRejectsForeignAndCredentialBearingURLs() {
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://s.cdninstagram.com/image.jpg"))
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://v.fbcdn.net/video.mp4"))
@@ -137,10 +203,10 @@ private final class AdapterHarness: NSObject, WKNavigationDelegate {
     @discardableResult func script(_ text:String) async throws -> Any? {
         try await webView.callAsyncJavaScript(text,arguments:[:],in:nil,contentWorld:.defaultClient)
     }
-    func request(_ operation:String,identifier:String = "") async throws -> InstagramDataResult {
+    func request(_ operation:String,identifier:String = "",message:String = "",context:String = "1234567890123456789") async throws -> InstagramDataResult {
         let path = try XCTUnwrap(Bundle.main.url(forResource:"instagram-data",withExtension:"js"))
         let source = try String(contentsOf:path,encoding:.utf8)
-        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier],in:nil,contentWorld:.defaultClient)
+        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier,"messageText":message,"clientContext":context],in:nil,contentWorld:.defaultClient)
         let text = try XCTUnwrap(output as? String)
         return try JSONDecoder().decode(InstagramDataResult.self,from:Data(text.utf8))
     }

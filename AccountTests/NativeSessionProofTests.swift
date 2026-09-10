@@ -45,7 +45,14 @@ final class NativeSessionProofTests: XCTestCase {
                 let asset = AVURLAsset(url:url)
                 let playable = try await asset.load(.isPlayable)
                 XCTAssertTrue(playable, "Instagram's video URL must load as a native playable asset")
-                print("PORCH_VIDEO assetPlayable=\(playable)")
+                let playback = MediaPlayback()
+                playback.start(url,muted:true)
+                let deadline = Date().addingTimeInterval(15)
+                while playback.elapsed < 0.75 && Date() < deadline { try await Task.sleep(for:.milliseconds(100)) }
+                let advanced = playback.elapsed >= 0.75
+                playback.stop()
+                XCTAssertTrue(advanced,"The real Instagram video must advance through native playback")
+                print("PORCH_VIDEO assetPlayable=\(playable) playbackAdvanced=\(advanced)")
             }
         }
         let inbox = try await client.request("inbox")

@@ -9,19 +9,25 @@ Monospaced utility labels and the short lime selection underline come from Plura
 ## Data path
 
 1. `InstagramBrowser` owns the real Instagram sign-in sheet and its normal persistent WebKit store. Authentication and challenges stay on Instagram.
-2. `InstagramDataClient` owns an empty local WebKit document with that same cookie store. Website JavaScript is disabled; only the bundled adapter runs in the app's content world. It loads no Instagram application HTML or scripts.
-3. `instagram-data.js` makes allowlisted, authenticated GET requests. It validates expected response shapes, identifies followed authors, removes recognized unwanted content, caps arrays and text, and returns a JSON model no larger than 1 MB.
+2. `WebKitInstagramTransport` owns an empty local WebKit document with that same cookie store. Website JavaScript is disabled; only the bundled adapter runs in the app's content world. It loads no Instagram application HTML or scripts.
+3. `instagram-data.js` makes allowlisted, authenticated GET requests and one explicit text-send POST. It validates expected response shapes, identifies followed authors, removes recognized unwanted content, caps arrays and text, and returns a JSON model no larger than 1 MB.
 4. SwiftUI renders the models. Media URLs are restricted to HTTPS Instagram CDN hosts; native media fetches do not receive session cookies from Porch. Videos are created on Play and stopped on disappearance, tab/carousel changes, or backgrounding.
 
 The Following endpoint must return `pagination_source: following`. The request uses that exact parameter; the website's `variant=following` query is not a substitute. Unknown modules are discarded. Ads, paid partnerships and clips are excluded. Missing positive following status excludes an author. Stories use the same positive relationship rule. Story and conversation detail IDs must have appeared in the corresponding list.
 
-The adapter does not mark stories/messages seen, send, like, follow or post. The inbox excludes pending requests. Conversation support is limited to the most recent 20 messages, with placeholders for attachments. Stories are bounded to 50 people and 30 items per person. These are visible-data limits, not claims that an account contains no other content.
+The adapter makes no seen-marker, like, follow or posting requests. Text sending is restricted to a conversation in the accepted inbox that has been opened, and requires a deliberate Send action. The inbox excludes pending requests. Conversations and inbox pages load 20 records at a time, with explicit controls for earlier records and a 200-record session bound. Non-text attachments have descriptive placeholders. Group sender names are retained when provided. Stories are bounded to 50 people and 30 items per person. These are visible-data limits, not claims that an account contains no other content.
 
 ## Failure behavior
 
-HTTP 401/403 and explicit login-required responses request sign-in. Rate limits stop requests for at least 60 seconds; nothing retries automatically. Fetches time out after 15 seconds. Unrecognized response contracts show a load failure instead of a successful empty view. End session releases the transport and content models while retaining sign-in. Clear sign-in additionally clears WebKit website data and the shared URL response cache.
+HTTP 401/403 and explicit login-required responses request sign-in. Rate limits stop both queued and new requests for at least 60 seconds, respecting longer Retry-After values up to a day; nothing retries automatically. Fetches time out after 15 seconds. Unrecognized response contracts show a load failure instead of a successful empty view. Requests are serialized; session generations reject late results after closing. Errors remain local to their destination. A failed refresh preserves existing content. End session releases the transport, content models and in-memory drafts while retaining sign-in and unresolved send identifiers. Clear sign-in additionally clears WebKit website data, the shared URL response cache and unresolved send identifiers.
 
 Instagram controls authentication, rate limits and data availability. These unofficial contracts can change. No App Store submission, Screen Time integration, NFC hardware, push service or backend is part of this release.
+
+## Text sending
+
+The only mutation is `/api/v1/direct_v2/threads/broadcast/text/`, with form-encoded text, an accepted thread ID and one generated client context. Input is bounded to 1,000 UTF-16 code units. The same context is used for the mutation and offline-threading fields. A valid server item receipt is required before displaying Sent; that status does not claim delivery to the recipient. No automatic send retries occur.
+
+A journal of conversation ID, request context and timestamp is written before dispatch, without the message body. A timeout, malformed response or app exit leaves the send unresolved and disables another send to that conversation. Checking the conversation can reconcile a matching outgoing context. Otherwise the user must explicitly clear the warning after checking Instagram; this also clears the draft and never resends it. Known rejection preserves the draft for correction. The current contract follows the open-source [instagrapi direct-send implementation](https://github.com/subzeroid/instagrapi/blob/master/instagrapi/mixins/direct.py); a fixture validates our encoding, not Instagram's live acceptance.
 
 ## Evidence
 

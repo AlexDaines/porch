@@ -1,27 +1,38 @@
 # Verification
 
-September 10, 2026. Xcode 26.6 / Swift 6.3.3, iOS 26.5 simulator, iPhone 17 Pro. The app targets iOS 18; iOS 18 and a physical phone have not been tested.
+September 10, 2026. Porch **0.2 (2)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
 
-## Passing checks
+## Simulator regression
 
-The final offline Porch suite passed **8 test definitions / 24 expanded cases**, with no failures. Local result: `Test-Porch-2026.09.10_04-37-25--0400.xcresult`.
+The final offline Porch suite passed **21 test definitions / 37 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_12-46-25--0400.xcresult`.
 
-The production adapter ran in actual WebKit against synthetic responses. Checks covered positive following status, ads/paid partnerships, Reels, recommendation modules, a legitimate caption containing “Sponsored,” photo/video carousel data, deduplication, explicit pagination, story/thread ID membership, accepted inbox isolation, malformed schemas, login and rate-limit failures, GET-only requests and CDN URL restrictions. Login navigation checks covered exact HTTPS hosts, credential-bearing/spoofed URLs and encoded discovery routes.
+The production adapter runs in actual WebKit with synthetic responses. Coverage includes Following-only filtering, paid partnerships/ads, Reels/recommendation exclusions, malformed schemas, restricted media URLs, explicit feed/inbox/thread pagination, accepted and opened recipient membership, sender alignment, bounded text encoding, acknowledgement validation, duplicate-send prevention and rate limits. These tests never send real messages.
 
-The sample UI journey opened a story by tapping its row, advanced and closed it, switched between Feed/Stories/Messages, opened Settings, ended the session and returned to Welcome. Whole-row hit testing was fixed after this check found untappable blank space. The journey also exercised navigation at the largest accessibility text size. Visual inspection found crowding in the first fallback layout; the final layout gives the sample label and Settings their own row. Full-screen captures replaced app-only snapshots that omitted unchanged compositing layers. Public screenshots were visually inspected and contain only fictional sample content.
+Client-state tests cover retained content after failed refresh/pagination, per-tab error isolation, late responses after session closure, the unresolved-send journal across restart, validation, duplicate taps and server-directed cooldown. The journal test proves that message bodies are absent from persisted attempt records.
 
-The final opt-in PorchAccountCheck suite passed **2 tests**, with no failures. Local result: `Test-PorchAccountCheck-2026.09.10_04-38-29--0400.xcresult`.
+The fictional UI journeys cover separate navigation, large-text navigation, session finish, failed refresh with retained content, the native keyboard/composer, acknowledged sending, disabled repeat sends and reconciliation after an uncertain result. The final fictional composer screenshot was visually inspected and is published in `docs/images/fictional-composer.png`.
 
-Using an existing signed-in account, that run returned **3 native Following posts, 1 followed story group with 1 media item, and 0 accepted inbox threads**, all without an adapter error. The story's video URL loaded through AVFoundation with `isPlayable == true`. Earlier probes also rendered four posts before the final exclusion rules were applied; counts are observations, not fixed acceptance expectations.
+Native AVPlayer tests prove time progression with a generated local video, stopping/releasing the player, and recovery from an invalid asset without a permanent spinner.
 
-The signed-in UI test verified separate native Feed, Stories and inbox views, opened and closed the native story viewer, and asserted that no web view was present in the reading screens. The real post images and story preview were visually inspected. No follows, likes, posts, messages or seen-marker requests were performed. Signed-in screenshots and raw result bundles remain private and excluded from git.
+## Read-only Instagram integration
 
-Adapter syntax and `git diff --check` passed. Candidate source paths were reviewed and scanned for credential/private-account material. No build products, signing material, raw responses or live account images belong in the release.
+The final opt-in PorchAccountCheck suite passed **2 tests**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-PorchAccountCheck-2026.09.10_12-47-40--0400.xcresult`.
 
-## Explicit limits
+The existing signed-in account returned **3 Following posts, 1 followed story group containing 1 media item, and 0 accepted inbox threads**, with no adapter error. A real Instagram video loaded as playable and advanced at least 0.75 seconds through AVPlayer's asynchronous time observer. This replaces the earlier unsuccessful synchronous playback probe; audio output is not established by this muted check.
 
-- **Video playback is not verified.** A separate synchronous playback-time probe stalled in the simulator's MediaToolbox/CoreAudio locks. Its run was interrupted and recorded as unsuccessful. The replacement asynchronous asset check proves that the media loads as playable; it does not prove time progression, audio output or physical-device playback. The app uses native AVKit behind an explicit Play button.
-- The live inbox was empty. Native conversation parsing/order is covered by synthetic fixtures; a populated live conversation has not been verified. Messages are read-only, capped to the most recent 20, and attachments are placeholders.
-- Native pagination, mixed-media carousels and adversarial exclusions have fixture coverage; not every variant has live coverage. Unofficial Instagram routes and response experiments can change. Excluded or unknown content may be omitted.
-- Existing sign-in was reused. A prior login-page check established reachability, but the rewritten sign-in sheet has not been re-tested from a freshly signed-out account, and challenge/2FA/alternate login flows are not fully verified.
-- This is an experimental open-source app, not an App Store release or a claim of complete Instagram compatibility.
+The UI journey opens and closes a story, switches among separate native Feed, Stories and inbox views, and verifies that reading screens contain no web view. Real media rendering was inspected privately. An earlier UI assertion expected every story preview to be an accessibility Image; the video preview exposes a Play button. The corrected assertion accepts the photo or actionable video preview. No follows, likes, posts, messages or seen-marker requests were performed. Private account screenshots and raw result bundles remain excluded from git.
+
+The fresh, signed-out PorchLiveCheck passed **1 test** on a separate iPhone 17e / iOS 26.5 simulator. It verified Instagram's login page and secure password field without entering credentials or disturbing the signed-in simulator. Local result: `Test-PorchLiveCheck-2026.09.10_12-40-39--0400.xcresult`. This proves form reachability, not completion of login, challenges or 2FA.
+
+## Physical device and Release
+
+The native build was signed, installed and launched on the paired iPhone 14 Pro Max. The selected physical-device suite passed **4 tests**: both local playback tests and both fictional composer/recovery UI journeys. Private result: `artifacts/private/uat-device.xcresult`. These checks use no Instagram requests and establish neither live delivery nor account login on the phone.
+
+`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 2 and is an arm64 device executable. The compiled Release binary contains none of the debug fixture flags, fixture transport symbol or test-message marker. Distribution and signing of this archive belong to the operator's own installation workflow.
+
+## Remaining acceptance
+
+- A populated real conversation, one explicitly authorized text send and a received reply remain unverified. Fixture acknowledgements are not delivery evidence. Sending is limited to existing accepted conversations; non-text attachments are descriptive placeholders.
+- Complete account login/challenge/2FA on the physical phone, audible video, live background/foreground behavior, and installation through the chosen homegrown Release workflow remain to be accepted.
+- Pagination and mixed-media variants have fixture coverage, not exhaustive live coverage. Instagram's unofficial routes and experiments may change or reject requests. Excluded or unknown content may be omitted.
+- This is an experimental source release. These passing checks do not establish production readiness or full Instagram compatibility. The friend testing journey is in [docs/UAT.md](docs/UAT.md).

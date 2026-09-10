@@ -12,7 +12,8 @@ final class InstagramBrowser: NSObject, ObservableObject, WKNavigationDelegate {
 
     func connect() {
         guard !clearingWebsiteData else { return }
-        authenticated = false; failure = nil
+        suspend()
+        authenticated = false; failure = nil; loading = true
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.limitsNavigationsToAppBoundDomains = true
@@ -21,7 +22,7 @@ final class InstagramBrowser: NSObject, ObservableObject, WKNavigationDelegate {
         view.navigationDelegate = self
         view.isOpaque = false; view.backgroundColor = .black
         webView = view
-        view.load(URLRequest(url:NavigationPolicy.login))
+        view.load(URLRequest(url:NavigationPolicy.login,timeoutInterval:25))
     }
     func suspend() {
         webView?.stopLoading(); webView?.pauseAllMediaPlayback(); webView?.navigationDelegate = nil
@@ -40,14 +41,15 @@ final class InstagramBrowser: NSObject, ObservableObject, WKNavigationDelegate {
         guard let url = action.request.url, NavigationPolicy.classify(url) == .allow else { decisionHandler(.cancel); return }
         decisionHandler(.allow)
     }
-    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { loading = true }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { if webView === self.webView { loading = true } }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard webView === self.webView else { return }
         loading = false
         if let path = webView.url?.path, path == "/" || path.hasPrefix("/direct/") { authenticated = true }
     }
-    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { fail(error) }
-    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { fail(error) }
-    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { loading = false; failure = "Couldn't open Instagram." }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if webView === self.webView { fail(error) } }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { if webView === self.webView { fail(error) } }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { if webView === self.webView { loading = false; failure = "Couldn't open Instagram." } }
     private func fail(_ error: Error) {
         guard (error as NSError).code != NSURLErrorCancelled else { return }
         loading = false; failure = "Couldn't open Instagram."
@@ -69,9 +71,10 @@ struct InstagramSignIn: View {
                 Button("Done") { dismiss() }.frame(minHeight:44)
             }.padding(.horizontal,16)
             PorchRule()
+            if browser.loading { ProgressView().padding(8).accessibilityLabel("Loading Instagram sign-in") }
             if let failure = browser.failure {
                 Text(failure).foregroundStyle(PorchTheme.muted).padding(30)
-                Button("Try again") { browser.connect() }
+                Button("Try again") { browser.connect() }.frame(minHeight:44)
                 Spacer()
             } else if let view = browser.webView { InstagramWebView(webView:view) }
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)

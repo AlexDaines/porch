@@ -1,0 +1,33 @@
+name: iOS checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate project
+        run: |
+          command -v xcodegen || brew install xcodegen
+          xcodegen generate
+      - name: Select available iPhone simulator
+        run: |
+          xcrun simctl list devices available -j > /tmp/devices.json
+          python3 - <<'PY' >> "$GITHUB_ENV"
+          import json
+          data = json.load(open('/tmp/devices.json'))
+          phones = [d for runtime, devices in data['devices'].items() if 'iOS' in runtime for d in devices if d['name'].startswith('iPhone')]
+          assert phones, 'No iPhone simulator installed'
+          print('PORCH_SIMULATOR=' + phones[0]['udid'])
+          PY
+      - name: Offline regression and UI journeys
+        run: xcodebuild -project Porch.xcodeproj -scheme Porch -destination "platform=iOS Simulator,id=$PORCH_SIMULATOR" -resultBundlePath test-results/offline.xcresult CODE_SIGNING_ALLOWED=NO test
+      - name: Build Release for devices
+        run: xcodebuild -project Porch.xcodeproj -scheme Porch -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build

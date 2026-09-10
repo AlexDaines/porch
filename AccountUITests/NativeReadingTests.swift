@@ -18,7 +18,9 @@ final class NativeReadingTests: XCTestCase {
         XCTAssertFalse(app.otherElements["native-post"].exists)
         capture(app,"Private separate stories")
         story.tap()
-        XCTAssertTrue(app.images["native-post-image"].waitForExistence(timeout:20))
+        capture(app,"Private story viewer initial render")
+        let preview = app.descendants(matching:.any).matching(NSPredicate(format:"identifier == %@ OR label == %@", "native-post-image", "Play video")).firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout:20),"A photo or actionable video preview must be present")
         XCTAssertEqual(app.webViews.count, 0)
         capture(app,"Private native story viewer")
         app.buttons["Close story"].firstMatch.tap()

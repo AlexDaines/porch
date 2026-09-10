@@ -4,4 +4,6 @@
 
 Apple system fonts and SF Symbols are used through system APIs and are not bundled third-party font files.
 
+`Tests/Fixtures/playback.mp4` is a project-generated, silent gray test clip. It contains no third-party footage and is bundled only in the test target.
+
 SocialLite and NoScroll were examined as product references. No implementation code was copied from them. Instagram content remains governed by its owners and Instagram's service terms; Porch does not redistribute account content as source assets.
