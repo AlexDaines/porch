@@ -12,12 +12,91 @@ targets:
   Porch:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources:
+      - path: Sources
+        excludes: [Resources, Info.plist]
+      - path: Sources/Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch
-        GENERATE_INFOPLIST_FILE: "YES"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: Sources/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: "Porch"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-
+  PorchTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [Tests]
+    dependencies:
+      - target: Porch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.tests
+  PorchUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: Porch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.uitests
+  PorchLiveTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [LiveTests]
+    dependencies:
+      - target: Porch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.livetests
+  PorchAccountTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [AccountTests]
+    dependencies:
+      - target: Porch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.accounttests
+  PorchAccountUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [AccountUITests]
+    dependencies:
+      - target: Porch
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.accountuitests
+schemes:
+  Porch:
+    build:
+      targets:
+        Porch: all
+    test:
+      targets:
+        - PorchTests
+        - PorchUITests
+  PorchLiveCheck:
+    build:
+      targets:
+        Porch: all
+    test:
+      targets:
+        - PorchLiveTests
+  PorchAccountCheck:
+    build:
+      targets:
+        Porch: all
+    test:
+      targets:
+        - PorchAccountTests
+        - PorchAccountUITests

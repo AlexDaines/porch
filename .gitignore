@@ -8,3 +8,4 @@ node_modules/
 test-results/
 *.xcresult/
 artifacts/private/
+artifacts/test-pass-*/
