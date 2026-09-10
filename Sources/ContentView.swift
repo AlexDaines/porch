@@ -5,7 +5,6 @@ struct ContentView: View {
     @StateObject private var browser = InstagramBrowser()
     @StateObject private var client = InstagramDataClient()
     @State private var showSignIn = false
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var nativeTab: PorchModel.Tab? { model.mode == .instagram ? model.tab : nil }
 
     var body: some View {
@@ -37,21 +36,17 @@ struct ContentView: View {
     }
     private var session: some View {
         VStack(spacing:0) {
-            HStack(spacing:dynamicTypeSize.isAccessibilitySize ? 8 : 18) {
-                ForEach([PorchModel.Tab.feed,.stories,.messages],id:\.self) { tab in
-                    Button { model.tab = tab } label: {
-                        Text(tab.rawValue).font(.subheadline.weight(model.tab == tab ? .semibold : .regular))
-                            .foregroundStyle(model.tab == tab ? PorchTheme.bone : PorchTheme.muted)
-                            .frame(minWidth:44,minHeight:44,alignment:.leading)
-                            .contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityIdentifier("tab-\(tab.rawValue)")
-                        .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 18) {
+                    tabControls
+                    Spacer(minLength: 0)
+                    sessionTools
                 }
-                Spacer(minLength:0)
-                if model.mode == .sample { Text("SAMPLE").font(.caption2).foregroundStyle(PorchTheme.muted) }
-                Button { model.showSettings = true } label: { Image(systemName:"ellipsis").frame(width:44,height:44) }
-                    .accessibilityLabel("Settings").accessibilityIdentifier("settings")
-            }.padding(.leading,16).padding(.trailing,4)
+                VStack(alignment: .leading, spacing: 4) {
+                    tabControls
+                    HStack { Spacer(minLength: 0); sessionTools }
+                }
+            }.padding(.leading,20).padding(.trailing,8).padding(.bottom,8)
             PorchRule()
             if model.mode == .sample {
                 switch model.tab {
@@ -60,6 +55,31 @@ struct ContentView: View {
                 default: SampleFeed(finish:finish)
                 }
             } else { liveContent }
+        }
+    }
+    @ViewBuilder private var tabControls: some View {
+        ForEach([PorchModel.Tab.feed,.stories,.messages],id:\.self) { tab in
+            Button { model.tab = tab } label: {
+                Text(tab.rawValue.uppercased()).font(PorchTheme.utility).tracking(0.8)
+                    .foregroundStyle(model.tab == tab ? PorchTheme.accent : PorchTheme.muted)
+                    .fixedSize(horizontal:true,vertical:false)
+                    .frame(minWidth:44,minHeight:44,alignment:.leading)
+                    .padding(.bottom,4)
+                    .overlay(alignment:.bottomLeading) {
+                        if model.tab == tab { Rectangle().fill(PorchTheme.accent).frame(width:32,height:2) }
+                    }
+                    .contentShape(Rectangle())
+            }.buttonStyle(.plain).accessibilityLabel(tab.rawValue)
+                .accessibilityIdentifier("tab-\(tab.rawValue)")
+                .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
+        }
+    }
+    private var sessionTools: some View {
+        HStack(spacing:0) {
+            if model.mode == .sample { Eyebrow(text:"Sample").fixedSize() }
+            Button { model.showSettings = true } label: {
+                Image(systemName:"ellipsis").font(.system(size:18)).foregroundStyle(PorchTheme.muted).frame(width:44,height:44)
+            }.accessibilityLabel("Settings").accessibilityIdentifier("settings")
         }
     }
     @ViewBuilder private var liveContent: some View {

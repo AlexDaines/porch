@@ -1,6 +1,8 @@
 # Design
 
-Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. Black, warm bone, neutral gray and thin rules follow the restraint of Plural and Light Phone. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
+Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and lime for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
+
+Monospaced utility labels and the short lime selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Content is left-aligned with 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
 
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
 

@@ -1,13 +1,13 @@
 import SwiftUI
 
-// Plural's restraint, reduced further toward Light Phone: quiet, monochrome controls.
+// Horse Weapons tokens from Plural, the moped travel-time app.
 enum PorchTheme {
     static let canvas = Color.black
     static let surface = Color(hex: 0x101010)
     static let bone = Color(hex: 0xE9E4D6)
-    static let muted = Color(hex: 0x939393)
-    static let line = Color(hex: 0x262626)
-    static let accent = bone
+    static let muted = Color(hex: 0x8A8375)
+    static let line = Color(hex: 0x26231F)
+    static let accent = Color(hex: 0xB6F23C)
     static let utility = Font.system(.caption2, design: .monospaced).weight(.semibold)
 }
 extension Color {
@@ -21,7 +21,7 @@ struct PorchButtonStyle: ButtonStyle {
         configuration.label.font(.system(.headline, design: .monospaced).weight(.bold))
             .frame(maxWidth: .infinity, minHeight: 50)
             .foregroundStyle(filled ? PorchTheme.canvas : PorchTheme.accent)
-            .background(filled ? PorchTheme.accent : PorchTheme.canvas)
+            .background(filled ? PorchTheme.bone : PorchTheme.canvas)
             .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
@@ -38,7 +38,7 @@ struct Avatar: View {
     var body: some View {
         Text(initials).font(.system(size: size * 0.28, weight: .medium, design: .monospaced))
             .foregroundStyle(PorchTheme.bone).frame(width: size, height: size)
-            .overlay(Circle().stroke(story ? PorchTheme.accent : PorchTheme.line, lineWidth: 1))
+            .overlay(Circle().stroke(story ? PorchTheme.muted : PorchTheme.line, lineWidth: 1))
     }
 }
 struct PorchRule: View {

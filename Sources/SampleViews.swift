@@ -26,12 +26,12 @@ struct SampleFeed: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
-                    Text("maya.kim").font(.subheadline.weight(.semibold))
+                    Text("maya.kim").font(.headline)
                     Spacer()
                     Eyebrow(text: "2h")
-                }.padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 14)
+                }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 12)
                 SampleLandscape(height: 320)
-                Text("Took the long way home.").font(.body).padding(.horizontal, 20).padding(.vertical, 16)
+                Text("Took the long way home.").font(.subheadline).padding(.horizontal, 20).padding(.vertical, 16)
                 PorchRule().padding(.horizontal, 20)
                 HStack {
                     Eyebrow(text: "Caught up")
@@ -52,7 +52,7 @@ struct SampleStories: View {
                     Button { story = index } label: {
                         HStack(spacing: 14) {
                             Avatar(initials: SampleContent.initials[index], size: 44, story: true)
-                            Text(SampleContent.names[index]).font(.body)
+                            Text(SampleContent.names[index]).font(.headline)
                             Spacer()
                             Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(PorchTheme.muted)
                         }.padding(.vertical, 16).contentShape(Rectangle())
@@ -96,9 +96,8 @@ struct SampleInbox: View {
                 ForEach(0..<3) { index in
                     Button { selected = index } label: {
                         HStack(spacing: 14) {
-                            Avatar(initials: SampleContent.initials[index], size: 42)
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(SampleContent.names[index]).font(.body.weight(.medium))
+                                Text(SampleContent.names[index]).font(.headline)
                                 Text(messages[index]).font(.subheadline).foregroundStyle(PorchTheme.muted).multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 0)

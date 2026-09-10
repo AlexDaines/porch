@@ -32,7 +32,7 @@ final class NativeReadingTests: XCTestCase {
     }
     @MainActor private func capture(_ app:XCUIApplication,_ name:String) {
         Thread.sleep(forTimeInterval:1)
-        let attachment = XCTAttachment(screenshot:app.screenshot())
+        let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
 }

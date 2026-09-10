@@ -37,9 +37,9 @@ struct NativeFeed: View {
                     Text("No posts.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top, 40)
                 }
                 if hasMore, let more {
-                    Button("More posts", action: more).font(.subheadline).frame(minHeight:44).padding(.vertical,16)
+                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.8).frame(minHeight:44).padding(.vertical,16)
                 } else if !posts.isEmpty {
-                    Text("Caught up").font(.caption).foregroundStyle(PorchTheme.muted).padding(.vertical, 24)
+                    Eyebrow(text:"Caught up").padding(.vertical, 24)
                 }
             }
         }.scrollIndicators(.hidden).background(PorchTheme.canvas)
@@ -54,13 +54,13 @@ struct NativePostCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(post.username).font(.subheadline.weight(.semibold))
+                Text(post.username).font(.headline)
                 Spacer()
                 if post.timestamp > 0 {
                     Text(Date(timeIntervalSince1970: post.timestamp), format: .dateTime.month(.abbreviated).day())
-                        .font(.caption).foregroundStyle(PorchTheme.muted)
+                        .font(PorchTheme.utility).foregroundStyle(PorchTheme.muted)
                 }
-            }.padding(.horizontal, 16).padding(.top, 16)
+            }.padding(.horizontal, 20).padding(.top, 20)
             if post.media.count == 1, let media = post.media.first {
                 NativeMedia(media: media)
             } else if !post.media.isEmpty {
@@ -69,18 +69,18 @@ struct NativePostCard: View {
                         NativeMedia(media: media, active: selectedImage == index).tag(index)
                     }
                 }.tabViewStyle(.page(indexDisplayMode: .never)).frame(height: 380)
-                Text("\(selectedImage + 1) / \(post.media.count)").font(.caption2)
-                    .foregroundStyle(PorchTheme.muted).padding(.horizontal, 16)
+                Text("\(selectedImage + 1) / \(post.media.count)").font(PorchTheme.utility)
+                    .foregroundStyle(PorchTheme.muted).padding(.horizontal, 20)
             }
             if !post.caption.isEmpty {
                 Text(post.caption).font(.subheadline).lineSpacing(3)
-                    .lineLimit(expanded ? nil : 4).padding(.horizontal, 16)
+                    .lineLimit(expanded ? nil : 4).padding(.horizontal, 20)
                 if !expanded && post.caption.count > 220 {
-                    Button("More") { expanded = true }.font(.caption)
-                        .foregroundStyle(PorchTheme.muted).frame(minHeight: 44).padding(.horizontal, 16)
+                    Button("MORE") { expanded = true }.font(PorchTheme.utility)
+                        .frame(minHeight: 44).padding(.horizontal, 20).accessibilityLabel("More caption")
                 }
             }
-            PorchRule().padding(.horizontal, 16).padding(.top, 4)
+            PorchRule().padding(.horizontal, 20).padding(.top, 4)
         }.foregroundStyle(PorchTheme.bone).accessibilityElement(children:.contain).accessibilityIdentifier("native-post")
     }
 }

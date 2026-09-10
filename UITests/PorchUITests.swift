@@ -29,12 +29,25 @@ final class PorchUITests: XCTestCase {
         app.buttons["Finish session"].tap()
         XCTAssertTrue(app.buttons["connect"].waitForExistence(timeout: 3))
         capture(app, "Welcome")
+
+        app.terminate()
+        app.launchArguments = ["--sample", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["tab-Stories"].waitForExistence(timeout: 10))
+        for tab in ["Feed", "Stories", "Messages"] {
+            XCTAssertTrue(app.buttons["tab-\(tab)"].isHittable)
+        }
+        app.buttons["tab-Stories"].tap()
+        XCTAssertTrue(app.buttons["Maya's sample story"].exists)
+        XCTAssertFalse(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].exists)
+        XCTAssertTrue(app.buttons["settings"].isHittable)
+        capture(app, "Large text stories")
     }
 
     @MainActor private func capture(_ app: XCUIApplication, _ name: String) {
         // Let sheet/tab compositing finish before keeping a public sample screenshot.
         Thread.sleep(forTimeInterval: 1)
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)

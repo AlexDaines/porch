@@ -4,13 +4,13 @@ September 10, 2026. Xcode 26.6 / Swift 6.3.3, iOS 26.5 simulator, iPhone 17 Pro.
 
 ## Passing checks
 
-The final offline Porch suite passed **8 test definitions / 24 expanded cases**, with no failures. Local result: `Test-Porch-2026.09.10_04-14-23--0400.xcresult`.
+The final offline Porch suite passed **8 test definitions / 24 expanded cases**, with no failures. Local result: `Test-Porch-2026.09.10_04-37-25--0400.xcresult`.
 
 The production adapter ran in actual WebKit against synthetic responses. Checks covered positive following status, ads/paid partnerships, Reels, recommendation modules, a legitimate caption containing “Sponsored,” photo/video carousel data, deduplication, explicit pagination, story/thread ID membership, accepted inbox isolation, malformed schemas, login and rate-limit failures, GET-only requests and CDN URL restrictions. Login navigation checks covered exact HTTPS hosts, credential-bearing/spoofed URLs and encoded discovery routes.
 
-The sample UI journey opened a story by tapping its row, advanced and closed it, switched between Feed/Stories/Messages, opened Settings, ended the session and returned to Welcome. Whole-row hit testing was fixed after this check found untappable blank space. Public screenshots were captured after compositing settled and visually inspected. They contain only fictional sample content.
+The sample UI journey opened a story by tapping its row, advanced and closed it, switched between Feed/Stories/Messages, opened Settings, ended the session and returned to Welcome. Whole-row hit testing was fixed after this check found untappable blank space. The journey also exercised navigation at the largest accessibility text size. Visual inspection found crowding in the first fallback layout; the final layout gives the sample label and Settings their own row. Full-screen captures replaced app-only snapshots that omitted unchanged compositing layers. Public screenshots were visually inspected and contain only fictional sample content.
 
-The final opt-in PorchAccountCheck suite passed **2 tests**, with no failures. Local result: `Test-PorchAccountCheck-2026.09.10_04-19-46--0400.xcresult`.
+The final opt-in PorchAccountCheck suite passed **2 tests**, with no failures. Local result: `Test-PorchAccountCheck-2026.09.10_04-38-29--0400.xcresult`.
 
 Using an existing signed-in account, that run returned **3 native Following posts, 1 followed story group with 1 media item, and 0 accepted inbox threads**, all without an adapter error. The story's video URL loaded through AVFoundation with `isPlayable == true`. Earlier probes also rendered four posts before the final exclusion rules were applied; counts are observations, not fixed acceptance expectations.
 

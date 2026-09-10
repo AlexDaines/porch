@@ -11,14 +11,15 @@ struct NativeStories: View {
                     Button { selected = person } label: {
                         HStack(spacing:16) {
                             Avatar(initials:String(person.username.prefix(2)).uppercased(),story:true)
-                            Text(person.username).font(.body)
+                            Text(person.username).font(.headline)
                             Spacer()
+                            Image(systemName:"arrow.up.right").font(.caption).foregroundStyle(PorchTheme.muted)
                         }.padding(.vertical,16).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityLabel("\(person.username)'s story")
                     PorchRule()
                 }
                 if people.isEmpty { Text("No stories.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top,40) }
-            }.padding(.horizontal,16)
+            }.padding(.horizontal,20)
         }.accessibilityIdentifier("native-stories")
             .sheet(item:$selected) { person in NativeStoryViewer(person:person,client:client) }
     }
@@ -35,7 +36,7 @@ struct NativeStoryViewer: View {
     var body: some View {
         VStack(spacing:20) {
             HStack {
-                Text(person.username).font(.subheadline.weight(.semibold))
+                Text(person.username).font(.headline)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close story")
             }
@@ -47,7 +48,7 @@ struct NativeStoryViewer: View {
                     Button { current = max(0,current-1) } label: { Image(systemName:"chevron.left").frame(width:44,height:44) }
                         .disabled(current == 0).accessibilityLabel("Previous story")
                     Spacer()
-                    Text("\(current+1) / \(items.count)").font(.caption).foregroundStyle(PorchTheme.muted)
+                    Text("\(current+1) / \(items.count)").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted)
                     Spacer()
                     Button { if current+1 < items.count { current += 1 } else { dismiss() } } label: {
                         Image(systemName:current+1 < items.count ? "chevron.right" : "checkmark").frame(width:44,height:44)
@@ -55,7 +56,7 @@ struct NativeStoryViewer: View {
                 }
             } else { Text(failed ? "Couldn't load this story." : "This story has ended.").foregroundStyle(PorchTheme.muted) }
             Spacer(minLength:0)
-        }.padding(16).background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
+        }.padding(20).background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
             .preferredColorScheme(.dark).presentationBackground(PorchTheme.canvas)
             .task {
                 do { let result = try await client.request("story",identifier:person.id); items = result.posts; failed = result.error != nil }
@@ -75,14 +76,14 @@ struct NativeInbox: View {
                 ForEach(threads) { thread in
                     Button { selected = thread } label: {
                         VStack(alignment:.leading,spacing:6) {
-                            Text(thread.title).font(.body)
+                            Text(thread.title).font(.headline)
                             if !thread.preview.isEmpty { Text(thread.preview).font(.subheadline).foregroundStyle(PorchTheme.muted).lineLimit(1) }
                         }.frame(maxWidth:.infinity,alignment:.leading).padding(.vertical,18).contentShape(Rectangle())
                     }.buttonStyle(.plain)
                     PorchRule()
                 }
                 if threads.isEmpty { Text("No messages.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top,40) }
-            }.padding(.horizontal,16)
+            }.padding(.horizontal,20)
         }.accessibilityIdentifier("native-inbox")
             .sheet(item:$selected) { thread in NativeConversation(thread:thread,client:client) }
     }
@@ -98,10 +99,10 @@ struct NativeConversation: View {
     var body: some View {
         VStack(spacing:0) {
             HStack {
-                Text(thread.title).font(.subheadline.weight(.semibold))
+                Text(thread.title).font(.headline)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close conversation")
-            }.padding(.horizontal,16)
+            }.padding(.horizontal,20)
             PorchRule()
             ScrollView {
                 VStack(spacing:16) {
@@ -113,7 +114,7 @@ struct NativeConversation: View {
                     if failed { Text("Couldn't load these messages.").foregroundStyle(PorchTheme.muted).padding(30) }
                 }.padding(16)
             }
-            Text("Read-only").font(.caption).foregroundStyle(PorchTheme.muted).padding(12)
+            Text("Read-only").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).padding(12)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
             .presentationBackground(PorchTheme.canvas)
             .task {
