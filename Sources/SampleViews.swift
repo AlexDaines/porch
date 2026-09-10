@@ -34,12 +34,11 @@ struct SampleFeed: View {
                 SampleLandscape(height: 320)
                 Text("Took the long way home.").font(PorchTheme.body).padding(.horizontal, 20).padding(.vertical, 12)
                 PorchRule().padding(.horizontal, 20)
-                HStack {
+                VStack(spacing: 0) {
                     Eyebrow(text: "Caught up")
-                    Spacer()
                     Button("END", action: finish).font(PorchTheme.utility).foregroundStyle(accent)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing).accessibilityLabel("Finish session")
-                }.padding(.horizontal, 20).padding(.top, 8)
+                        .frame(minWidth: 44, minHeight: 44).accessibilityLabel("Finish session")
+                }.frame(maxWidth: .infinity).padding(.horizontal, 20).padding(.top, 16)
             }
         }.scrollIndicators(.hidden)
     }
@@ -71,21 +70,16 @@ struct SampleStory: View {
     init(start: Int) { _current = State(initialValue: start) }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(SampleContent.names[current]).font(PorchTheme.title)
-                    Spacer()
-                    Eyebrow(text: "Sample · \(current + 1)/4")
-                    Button("CLOSE") { dismiss() }.font(PorchTheme.utility).frame(minWidth: 44, minHeight: 44)
-                        .foregroundStyle(accent).accessibilityLabel("Close")
-                }
+            VStack(spacing: 12) {
+                PorchSheetHeader(title: SampleContent.names[current]) { dismiss() }
+                Eyebrow(text: "Sample · \(current + 1)/4")
                 SampleLandscape(height: 400)
                 Text(["Somewhere with no agenda.", "A good day to take the scenic route.", "Wish you were here.", "See you when we're back."][current]).font(PorchTheme.body)
                 Button(current == 3 ? "DONE" : "NEXT") {
                     if current == 3 { dismiss() } else { current += 1 }
                 }.buttonStyle(PorchButtonStyle())
                     .accessibilityLabel(current == 3 ? "All done" : "Next story")
-            }.padding(20)
+            }.padding(20).multilineTextAlignment(.center)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet()
     }
 }
@@ -111,11 +105,7 @@ struct SampleInbox: View {
             }.padding(.horizontal, 20)
         }.sheet(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(SampleContent.names[selected ?? 0]).font(PorchTheme.title)
-                    Spacer()
-                    Button("CLOSE") { selected = nil }.font(PorchTheme.utility).foregroundStyle(accent).frame(minHeight: 44)
-                }
+                PorchSheetHeader(title: SampleContent.names[selected ?? 0]) { selected = nil }
                 PorchRule()
                 Text(messages[selected ?? 0]).font(PorchTheme.body)
                 Eyebrow(text: "Sample · sending unavailable")

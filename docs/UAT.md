@@ -1,6 +1,6 @@
 # Porch 0.2 UAT
 
-This build is for testing the native reading and messaging flows. It is not a claim of full Instagram compatibility. Installation is handled by the operator's existing workflow. See [VERIFICATION.md](../VERIFICATION.md) for observed evidence and remaining acceptance gates.
+The current build is an internal iteration; friend UAT has not started. It is not a claim of full Instagram compatibility. Installation is handled by the operator's existing workflow. See [VERIFICATION.md](../VERIFICATION.md) for observed evidence and remaining acceptance gates.
 
 ## Internal acceptance before inviting friends
 
@@ -12,7 +12,7 @@ This build is for testing the native reading and messaging flows. It is not a cl
 
 On first launch, choose a color or continue with Sage. Reopen Porch and confirm the introduction stays completed. In Settings → Color, change the accent and check it remains selected after restarting.
 
-1. Sign in through Instagram. Close and reopen Porch, then use Open Instagram without re-entering credentials. Clear sign-in when finished; that removes local session data.
+1. Tap Sign in to Instagram. Cancel once and check that Porch returns to the welcome screen. Reopen sign-in and complete it on Instagram. Close and reopen Porch, then use Open Porch without re-entering credentials. Clear sign-in when finished; that removes local session data.
 2. Open Feed. Check that it contains followed posts and has no story tray, Reels or suggested modules. Swipe a carousel. Tap Play on a video; backgrounding or leaving the view should stop it.
 3. Open Stories. Choose a person, advance and close manually. Stories should not advance themselves or reveal Feed underneath the content area.
 4. Open an existing conversation. Check sender names, load earlier messages, send one agreed test message, and compare the result with Instagram. Sent means acknowledged, not read or delivered.

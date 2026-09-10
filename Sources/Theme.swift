@@ -7,11 +7,12 @@ enum PorchTheme {
     static let bone = Color(hex: 0xE9E4D6)
     static let muted = Color(hex: 0x8A8375)
     static let line = Color(hex: 0x26231F)
-    // Native text styles keep the smaller default scale responsive to Dynamic Type.
-    static let title = Font.system(.footnote).weight(.medium)
-    static let body = Font.system(.footnote)
-    static let detail = Font.system(.caption)
-    static let utility = Font.system(.caption2, design: .monospaced)
+    // Minimal chrome must not mean miniature reading text. All styles scale with Dynamic Type.
+    static let heading = Font.system(.title2).weight(.medium)
+    static let title = Font.system(.body).weight(.medium)
+    static let body = Font.system(.body)
+    static let detail = Font.system(.subheadline)
+    static let utility = Font.system(.subheadline, design: .monospaced)
 }
 
 enum PorchColor: String, CaseIterable, Identifiable {
@@ -69,7 +70,7 @@ struct PorchButtonStyle: ButtonStyle {
     @Environment(\.porchAccent) private var accent
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(PorchTheme.body)
-            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .frame(minWidth: 44, minHeight: 44)
             .contentShape(Rectangle())
             .foregroundStyle(accent)
             .opacity(configuration.isPressed ? 0.75 : 1)
@@ -83,7 +84,7 @@ struct Eyebrow: View {
 }
 struct Avatar: View {
     let initials: String
-    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 28
+    @ScaledMetric(relativeTo: .subheadline) private var size: CGFloat = 32
     var story = false
     var body: some View {
         Text(initials).font(PorchTheme.utility)
@@ -93,6 +94,24 @@ struct Avatar: View {
 }
 struct PorchRule: View {
     var body: some View { Rectangle().fill(PorchTheme.line).frame(height: 1).accessibilityHidden(true) }
+}
+
+struct PorchSheetHeader: View {
+    let title: String
+    var closeLabel = "Close"
+    var closeDisabled = false
+    var identifier = "sheet-title"
+    let close: () -> Void
+    var body: some View {
+        HStack(spacing: 8) {
+            Color.clear.frame(width: 44, height: 44).accessibilityHidden(true)
+            Text(title).font(PorchTheme.title).multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity).accessibilityAddTraits(.isHeader).accessibilityIdentifier(identifier)
+            Button(action: close) {
+                Image(systemName: "xmark").font(PorchTheme.body).frame(width: 44, height: 44)
+            }.accessibilityLabel(closeLabel).disabled(closeDisabled)
+        }.padding(.horizontal, 12).padding(.vertical, 4)
+    }
 }
 
 extension View {
@@ -115,18 +134,18 @@ struct PorchConfirmation: View {
     let confirm: () -> Void
     let cancel: () -> Void
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 8) {
             Text(title).font(PorchTheme.title).accessibilityAddTraits(.isHeader)
             Text(message).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
             ViewThatFits(in: .horizontal) {
                 HStack { actions }.fixedSize(horizontal: true, vertical: false)
-                VStack(alignment: .leading, spacing: 0) { actions }
+                VStack(spacing: 0) { actions }
             }
-        }
+        }.frame(maxWidth: .infinity).multilineTextAlignment(.center)
     }
     @ViewBuilder private var actions: some View {
         Button(actionTitle, role: destructive ? .destructive : nil, action: confirm)
-            .foregroundStyle(accent).frame(minWidth: 44, minHeight: 44, alignment: .leading).fixedSize(horizontal: false, vertical: true)
+            .foregroundStyle(accent).frame(minWidth: 44, minHeight: 44).fixedSize(horizontal: false, vertical: true)
         Button("Cancel", action: cancel).foregroundStyle(PorchTheme.muted)
             .frame(minWidth: 44, minHeight: 44).padding(.horizontal, 12)
     }

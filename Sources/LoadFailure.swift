@@ -5,11 +5,11 @@ struct LoadFailure: View {
     let retry: () -> Void
     var actionTitle: String? = nil
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 8) {
             Text(Self.message(code)).font(PorchTheme.body).foregroundStyle(PorchTheme.muted)
             Button(actionTitle ?? (code == "signIn" ? "SIGN IN" : "TRY AGAIN"), action: retry)
                 .font(PorchTheme.utility).frame(minHeight: 44)
-        }.frame(maxWidth: .infinity, alignment: .leading).padding(20)
+        }.frame(maxWidth: .infinity).multilineTextAlignment(.center).padding(20)
             .accessibilityIdentifier("load-error")
     }
     static func message(_ code: String) -> String {

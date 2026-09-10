@@ -61,7 +61,16 @@ function post(item) {
     caption: String(item.caption?.text || '').slice(0, 2200), timestamp: Number(item.taken_at) || 0, media};
 }
 try {
-  if (operation === 'feed' || operation === 'moreFeed') {
+  if (operation === 'sessionHint') {
+    // A local hint for the entry label, never proof of authentication. No request.
+    result.diagnostic = {savedSession: /^\d+$/.test(cookie('ds_user_id') || '') ? 'present' : 'absent'};
+  } else if (operation === 'session') {
+    const ownID = cookie('ds_user_id');
+    if (!/^\d+$/.test(ownID || '')) throw new Error('signIn');
+    const data = await request('/api/v1/direct_v2/inbox/?limit=1&thread_message_limit=1');
+    if (!Array.isArray(data.inbox?.threads)) throw new Error('unsupported');
+    // Only authenticated success crosses to native code. No conversation content.
+  } else if (operation === 'feed' || operation === 'moreFeed') {
     if (operation === 'moreFeed' && !state.feedCursor) throw new Error('unavailable');
     const cursor = operation === 'moreFeed' ? '&max_id=' + encodeURIComponent(state.feedCursor) : '';
     const data = await request('/api/v1/feed/timeline/?count=12&pagination_source=following&reason=pull_to_refresh' + cursor);

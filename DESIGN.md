@@ -2,15 +2,15 @@
 
 Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and a personal accent for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
 
-Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Content is left-aligned with 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
+Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Entry screens, control groups and sheet titles are centered. Reading paragraphs retain 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
 
 Every Porch interface shape has sharp corners. Swatches, selection outlines, avatars, play-button backgrounds and message fields are rectangular. App sheets explicitly use a zero corner radius and no drag handle. Settings uses a plain header; confirmations appear inline with explicit confirm and cancel actions. This rule governs Porch's surfaces; Instagram authentication and OS-owned keyboards, sharing and playback controls retain their own rendering.
 
 ## Color introduction
 
-The user's [Light Phone](https://www.thelightphone.com/) reference informs the small visual scale: 13-point default titles and body, 12-point details and 11-point regular monospaced utilities. These use native Dynamic Type text styles so accessibility settings still enlarge them. Story avatars are 28 points by default and scale with their initials. Navigation uses a 24-point-wide, one-point-high selection rule. Names use medium weight; reading copy remains regular. Compact text actions replace large filled buttons. Tighter rows leave space around the content without turning labels into headings.
+The user's [Light Phone](https://www.thelightphone.com/) reference informs the restraint, not miniature text. After rejecting the previous tiny scale, the user asked for larger text and centered elements. Body text and names are 17 points, details and monospaced utilities are 15 points, and onboarding headings are 22 points. Native Dynamic Type styles retain accessibility scaling. Story avatars are 32 points by default and scale with their initials. The three navigation labels form a centered group with equal space on either side; the Settings control occupies the trailing space. At accessibility sizes, the controls stack in the center. Sheet titles use equal-width side spaces so the close button cannot pull a title off-center. Names use medium weight; reading copy remains regular.
 
-The first launch asks only “Choose a color.” Five 20-point square swatches, a selected checkmark and a small Continue action form one compact group on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
+The first launch asks only “Choose a color.” Five 28-point square swatches, a selected checkmark and a Continue action form one centered group on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
 
 | Choice | Accent |
 | --- | --- |
@@ -27,6 +27,16 @@ Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised sur
 The system launch screen uses an explicit black color asset and dark appearance, matching the native canvas before SwiftUI loads. [Apple's launch-background key](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen/uicolorname) otherwise defaults to the device's system background; that produced a white startup flash on a device using light appearance.
 
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
+
+## Sign-in journey
+
+After choosing a color, “Sign in to Instagram” opens the real authentication page immediately. It never opens a feed to discover whether sign-in is needed. Cancel returns to the entry screen and invalidates pending checks; a late result cannot enter the app. Instagram handles credentials and challenges. Cookie changes and completed navigation trigger verification. Porch opens automatically after success, leaving Instagram’s form with one clear Log in action. Incomplete sign-in stays in the form; a failed connection check offers an explicit retry.
+
+On returning launches, an empty local WebKit document checks for the account cookie and reports only its presence. This makes no Instagram request. A fresh WebKit cookie-store query returned empty before initialization on the tested device; the local probe avoids mistaking that for a signed-out account. [WebKit's app-bound documentation](https://webkit.org/blog/10882/app-bound-domains/) describes the relevant cookie/API restrictions.
+
+A saved-session hint offers “Open Porch”. Tapping verifies authentication with a bounded accepted-inbox GET; only success/error crosses to native code, with no conversation content. An expired session opens sign-in; connectivity failures stay on the entry screen with retry and Sign in again available. The same validation governs a new login. Cookie presence and URLs never establish success alone. Failed network checks do not retry automatically. The browser has a bounded load timeout, and retry mounts a new web view.
+
+Authentication currently supports Instagram-hosted username/password and challenge pages. External sign-in options such as Facebook show an explanation; they are not silently treated as completed authentication.
 
 ## Data path
 

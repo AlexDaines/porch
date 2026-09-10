@@ -2,9 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var model = PorchModel()
-    @StateObject private var browser = InstagramBrowser()
+    @StateObject private var browser: InstagramBrowser
+    @StateObject private var connection: InstagramConnection
     @StateObject private var client = InstagramDataClient.appClient()
-    @State private var showSignIn = false
     @AppStorage("porch.appearance.color", store: AppearancePreferences.store) private var colorName = PorchColor.sage.rawValue
     @AppStorage("porch.appearance.introComplete", store: AppearancePreferences.store) private var introComplete = false
     private var colorSelection: Binding<PorchColor> {
@@ -12,6 +12,15 @@ struct ContentView: View {
     }
     private var accent: Color { colorSelection.wrappedValue.color }
     private var nativeTab: PorchModel.Tab? { model.mode == .instagram ? model.tab : nil }
+    private var showingSignIn: Binding<Bool> {
+        Binding(get: { connection.phase == .signingIn }, set: { if !$0 && connection.phase == .signingIn { connection.cancel() } })
+    }
+
+    init() {
+        let browser = InstagramBrowser()
+        _browser = StateObject(wrappedValue: browser)
+        _connection = StateObject(wrappedValue: InstagramConnection(browser: browser))
+    }
 
     var body: some View {
         ZStack {
@@ -21,43 +30,50 @@ struct ContentView: View {
             } else {
                 switch model.mode {
                 case .welcome, .finished:
-                    WelcomeView(connect:connect,sample:{ model.mode = .sample; model.tab = .feed })
+                    WelcomeView(connection:connection,sample:{ model.mode = .sample; model.tab = .feed })
                 case .sample, .instagram: session
                 }
             }
         }.font(PorchTheme.body).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent).buttonStyle(.plain)
             .sheet(isPresented:$model.showSettings) { SettingsView(model:model,browser:browser,client:client,colorSelection:colorSelection) }
-            .sheet(isPresented:$showSignIn,onDismiss:{
-                browser.suspend(); client.close()
-                if model.mode == .instagram { Task { await client.load(model.tab) } }
-            }) { InstagramSignIn(browser:browser) }
-            .onChange(of:browser.authenticated) { _, value in if value { showSignIn = false } }
-            .onChange(of:model.mode) { _, mode in if mode != .instagram { client.close() } }
+            .sheet(isPresented:showingSignIn) { InstagramSignIn(browser:browser,connection:connection) }
+            .onChange(of:connection.phase) { _, phase in
+                if phase == .connected {
+                    client.close()
+                    if model.mode == .instagram { Task { await client.load(model.tab) } }
+                    else { connect() }
+                }
+            }
+            .onChange(of:model.mode) { _, mode in
+                if mode != .instagram { client.close(); connection.cancel() }
+            }
             .task(id:nativeTab) {
                 if let tab = nativeTab {
                     await client.load(tab)
-                    if client.error == "signIn" { signIn() }
                 }
             }
             .onAppear {
+                #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--native") { connect() }
                 if ProcessInfo.processInfo.arguments.contains("--sign-in") { signIn() }
+                #endif
             }
             .environment(\.porchAccent, accent)
     }
     private var session: some View {
         VStack(spacing:0) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 18) {
-                    tabControls
-                    Spacer(minLength: 0)
+                HStack(spacing: 0) {
+                    Color.clear.frame(width: 44).accessibilityHidden(true)
+                    HStack(spacing: 18) { tabControls }.frame(maxWidth: .infinity)
                     sessionTools
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    tabControls
-                    HStack { Spacer(minLength: 0); sessionTools }
-                }
-            }.padding(.leading,20).padding(.trailing,8).padding(.bottom,4)
+                }.fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: 4) {
+                    VStack(spacing: 0) { tabControls }
+                    sessionTools
+                }.frame(maxWidth: .infinity)
+            }.padding(.horizontal,8).padding(.bottom,4)
+            if model.mode == .sample { Eyebrow(text: "Sample").padding(.bottom, 8) }
             PorchRule()
             if model.mode == .sample {
                 switch model.tab {
@@ -71,25 +87,25 @@ struct ContentView: View {
     @ViewBuilder private var tabControls: some View {
         ForEach([PorchModel.Tab.feed,.stories,.messages],id:\.self) { tab in
             Button { model.tab = tab } label: {
-                Text(tab.rawValue.uppercased()).font(PorchTheme.utility).tracking(0.4)
+                Text(tab.rawValue).font(PorchTheme.utility)
                     .foregroundStyle(model.tab == tab ? accent : PorchTheme.muted)
                     .fixedSize(horizontal:true,vertical:false)
-                    .frame(minWidth:44,minHeight:44,alignment:.leading)
+                    .frame(minWidth:44,minHeight:44)
                     .padding(.bottom,4)
-                    .overlay(alignment:.bottomLeading) {
+                    .overlay(alignment:.bottom) {
                         if model.tab == tab { Rectangle().fill(accent).frame(width:24,height:1) }
                     }
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel(tab.rawValue)
                 .accessibilityIdentifier("tab-\(tab.rawValue)")
                 .accessibilityAddTraits(model.tab == tab ? .isSelected : [])
+                .accessibilityValue(model.mode == .sample ? "Sample" : "")
         }
     }
     private var sessionTools: some View {
         HStack(spacing:0) {
-            if model.mode == .sample { Eyebrow(text:"Sample").fixedSize() }
             Button { model.showSettings = true } label: {
-                Image(systemName:"ellipsis").font(.system(size:14)).foregroundStyle(PorchTheme.muted).frame(width:44,height:44)
+                Image(systemName:"ellipsis").font(PorchTheme.body).foregroundStyle(PorchTheme.muted).frame(width:44,height:44)
             }.accessibilityLabel("Settings").accessibilityIdentifier("settings")
         }
     }
@@ -116,6 +132,6 @@ struct ContentView: View {
         }
     }
     private func connect() { model.tab = .feed; model.mode = .instagram }
-    private func signIn() { browser.connect(); showSignIn = true }
-    private func finish() { client.close(); browser.suspend(); model.mode = .welcome }
+    private func signIn() { connection.signIn() }
+    private func finish() { client.close(); connection.cancel(); model.mode = .welcome }
 }

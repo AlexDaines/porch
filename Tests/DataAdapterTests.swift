@@ -4,6 +4,37 @@ import WebKit
 
 @MainActor
 final class DataAdapterTests: XCTestCase {
+    func testSessionRequiresAuthenticatedInboxWithoutReturningMessages() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        let hint = try await harness.request("sessionHint")
+        XCTAssertEqual(hint.diagnostic["savedSession"], "absent")
+        let missing = try await harness.request("session")
+        XCTAssertEqual(missing.error, "signIn")
+        try await harness.script(#"""
+        document.cookie = 'ds_user_id=7; path=/';
+        globalThis.pages = [
+          {status:'ok',inbox:{threads:[{thread_id:'21',items:[{text:'Private fixture text'}]}]}},
+          {status:'fail',message:'challenge_required'},
+          {status:'ok'},
+          {__http:401}
+        ];
+        """#)
+        let savedHint = try await harness.request("sessionHint")
+        XCTAssertEqual(savedHint.diagnostic["savedSession"], "present")
+        let session = try await harness.request("session")
+        XCTAssertNil(session.error)
+        XCTAssertTrue(session.posts.isEmpty && session.stories.isEmpty && session.threads.isEmpty && session.messages.isEmpty)
+        let challenge = try await harness.request("session")
+        XCTAssertEqual(challenge.error, "signIn")
+        let malformed = try await harness.request("session")
+        XCTAssertEqual(malformed.error, "unsupported")
+        let expired = try await harness.request("session")
+        XCTAssertEqual(expired.error, "signIn")
+        let safeReads = try await harness.script("return calls.length === 4 && calls.every(c => c.path === '/api/v1/direct_v2/inbox/?limit=1&thread_message_limit=1' && c.options.method === 'GET');") as? Bool
+        XCTAssertEqual(safeReads, true)
+    }
+
     func testFollowingContentIsFilteredBeforeRenderingAndPaginationIsExplicit() async throws {
         let harness = AdapterHarness()
         try await harness.prepare()

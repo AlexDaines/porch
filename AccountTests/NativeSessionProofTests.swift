@@ -4,6 +4,18 @@ import AVFoundation
 @testable import Porch
 
 final class NativeSessionProofTests: XCTestCase {
+    @MainActor func testSavedSessionIsDiscoveredBeforeAnyContentRequest() async throws {
+        let browser = InstagramBrowser()
+        let saved = await browser.hasSavedSession()
+        XCTAssertTrue(saved, "Discover the existing sign-in without opening Instagram or loading content")
+        browser.suspend()
+        let transport = WebKitInstagramTransport()
+        defer { transport.close() }
+        let result = try await transport.execute("session")
+        XCTAssertNil(result.error, "The existing session must pass a real authenticated request")
+        XCTAssertTrue(result.threads.isEmpty && result.messages.isEmpty)
+    }
+
     @MainActor func testNativeFeedFromExistingSession() async throws {
         let client = InstagramDataClient()
         defer { client.close() }

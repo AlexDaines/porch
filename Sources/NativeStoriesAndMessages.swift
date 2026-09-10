@@ -38,11 +38,7 @@ struct NativeStoryViewer: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing:12) {
-                    HStack {
-                        Text(person.username).font(PorchTheme.title)
-                        Spacer()
-                        Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close story")
-                    }
+                    PorchSheetHeader(title: person.username, closeLabel: "Close story") { dismiss() }
                     Spacer(minLength:0)
                     if loading { ProgressView() }
                     else if let error { LoadFailure(code:error,retry:{ if error == "signIn" { dismiss() } else { retry += 1 } },actionTitle:error == "signIn" ? "CLOSE STORY" : nil) }
@@ -122,11 +118,7 @@ struct NativeConversation: View {
     private var validDraft: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && draft.utf16.count <= 1000 }
     var body: some View {
         VStack(spacing:0) {
-            HStack {
-                Text(thread.title).font(PorchTheme.title)
-                Spacer()
-                Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close conversation")
-            }.padding(.horizontal,20)
+            PorchSheetHeader(title: thread.title, closeLabel: "Close conversation") { dismiss() }
             PorchRule()
             ScrollViewReader { proxy in
                 ScrollView {

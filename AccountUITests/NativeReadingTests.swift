@@ -5,8 +5,16 @@ final class NativeReadingTests: XCTestCase {
     @MainActor func testFeedStoriesAndInboxUseSeparateNativeViews() {
         let app = XCUIApplication()
         continueAfterFailure = false
-        app.launchArguments = ["--native"]
+        app.launchArguments = ["--appearance-fixture", "--reset-appearance"]
         app.launch()
+        XCTAssertTrue(app.buttons["color-continue"].waitForExistence(timeout: 10))
+        app.buttons["color-continue"].tap()
+        let connect = app.buttons["connect"]
+        XCTAssertTrue(connect.waitForExistence(timeout: 3))
+        let savedSession = NSPredicate(format: "label == %@", "Open Porch")
+        expectation(for: savedSession, evaluatedWith: connect)
+        waitForExpectations(timeout: 5)
+        connect.tap()
         XCTAssertTrue(app.otherElements["native-post"].firstMatch.waitForExistence(timeout: 30))
         XCTAssertEqual(app.webViews.count, 0)
         XCTAssertFalse(app.scrollViews["native-stories"].exists)

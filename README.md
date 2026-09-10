@@ -12,7 +12,7 @@ There is no subscription, Porch account, backend, advertising, or app analytics.
 
 Screenshots use fictional sample content. Signed-in verification is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
-## UAT build
+## Current build
 
 - A quiet first-launch color choice: Sage, Sea, Mist, Lilac or Sand. Square swatches and sharp corners throughout Porch. Continue with the default or choose your own; Settings → Color changes it any time.
 - Native Following posts and carousels. Recognized ads, paid partnerships, Reels and recommendation modules are excluded before rendering. Authors must be positively identified as followed.
@@ -20,7 +20,7 @@ Screenshots use fictional sample content. Signed-in verification is recorded sep
 - Videos have an explicit Play control. No autoplay.
 - Read accepted conversations, load earlier messages and send text from a native composer. Sending requires an acknowledgement; uncertain sends stay visibly unresolved and cannot retry automatically. Non-text attachments have descriptive placeholders. No message requests, likes, follows or posting.
 - Posts, older conversations and earlier messages load only when requested. Pull to refresh or use Settings → Reload. Failed refreshes preserve loaded content. Each session holds at most 200 posts/conversations/messages per relevant view.
-- Sign in through Instagram's own page. End a session to close content; Clear sign-in removes the local website data and shared media-response cache.
+- Sign in directly through Instagram's own page, or open a saved session after verification. Cancel returns to the entry screen. End a session to close content; Clear sign-in removes the local website data and shared media-response cache.
 - A fully offline sample needs no Instagram account.
 
 This is an **experimental source release**. Native playback progression is verified in the simulator with both a local fixture and a real Instagram video. Live DM delivery and physical-device acceptance still require verification before friend UAT. Instagram's unofficial data routes can change or reject requests. Following means accounts you follow, not necessarily personal friends. Unknown content can be omitted; the adapter does not guarantee complete coverage. It does not block the separate Instagram app. There is no App Store release.
@@ -48,7 +48,7 @@ xcodebuild -project Porch.xcodeproj -scheme Porch \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
-The default suite uses fictional fixtures and a nonpersistent WebKit store. `PorchLiveCheck` is an opt-in signed-out login-page check. `PorchAccountCheck` is an opt-in read-only integration check that requires an existing signed-in account with a Following post and an active story. It retains private screenshots in the local Xcode result bundle; never publish those results.
+The default suite uses fictional fixtures. Adapter tests use a nonpersistent WebKit store; offline UI journeys make no Instagram requests. `PorchLiveCheck` checks the actual signed-out path from color selection through the login form, cancellation and reopening. `PorchAccountCheck` is an opt-in read-only integration check that requires an existing signed-in account with a Following post and an active story. It retains private screenshots in the local Xcode result bundle; never publish those results.
 
 ## Preparing the UAT build
 

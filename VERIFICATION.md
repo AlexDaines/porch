@@ -1,52 +1,46 @@
 # Verification
 
-September 10, 2026. Porch **0.2 (6)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 10, 2026. Porch **0.2 (7)**. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
 
-## Simulator regression
+## Layout and offline behavior
 
-The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-55-06--0400.xcresult`.
+The offline Porch suite passed **27 test definitions / 43 expanded cases**, with no failures, on iPhone 17 Pro. Final clean-build result: `artifacts/private/verified-offline.xcresult`. All four connection-state tests are included, with the final recovery change.
 
-Build 6 reduces the default scale to 13-point title/body, 12-point details and 11-point regular utilities. Swatches are 20 points inside 44-point tap areas; avatars are 28 points and scale with Dynamic Type. Compact text actions replace filled entry buttons and the introduction's full-width action. The standard introduction, maximum-text introduction, entry links, story rows, expanded Settings and fictional composer were visually inspected. The first review caught centered entry links and Settings swatches; both now align to the left margin, with the corrected screenshots reviewed and the suite rerun successfully. Color persistence, large-text navigation and cancellation/send recovery remain covered by the same offline journeys.
+Build 7 replaces the rejected 13/12/11-point scale with 17-point body/name text, 15-point details and utility labels, and 22-point onboarding headings. Entry screens, swatches, navigation, sheet titles and Settings actions are centered. Swatches remain square and are now 28 points inside 44-point tap areas. App-owned surfaces retain sharp corners.
 
-Build 5 applies the user's sharp-corner rule to swatches, selection outlines, story avatars, play-button backgrounds and app sheets. Settings uses a plain header and confirmations appear inline. The introduction, largest-text introduction, expanded color settings, stories, sample conversation, clear-sign-in confirmation and fictional native composer were visually inspected. The existing UI journeys now also verify that cancelling sign-in clearing retains the session, and cancelling the unresolved-send confirmation preserves the draft and send block. Only fictional transport was used for sending checks. [Color settings screenshot](docs/images/color-settings.png).
+Normal-size introduction, entry, Settings, feed, Stories, story viewer, conversation and fictional composer screenshots were inspected. Maximum-accessibility introduction and navigation were checked separately. The UI journey also measures the entry button and color group's horizontal centers against the actual screen center. Public screenshots contain only fictional content or generic entry UI.
 
-The color introduction journey verifies first launch without a web view, selecting Mist, continuing, changing to Lilac in Settings, persistence through restart, no repeated introduction, all five swatches at the largest accessibility text size and continuing with the default color. The introduction, colored sample feed and expanded Settings were visually inspected. An inherited accessibility identifier initially shadowed the Settings swatch identifiers; removing it and querying the visible disclosure label resolved the failed test. A duplicate selected-color label in expanded Settings was removed after visual review.
+The fixture suites cover Following-only filtering, ads/Reels/recommendation exclusions, malformed schemas, explicit pagination, restricted media URLs, accepted/opened conversation membership, sender alignment, text encoding, server acknowledgement, duplicate-send prevention, unresolved-send recovery, rate limits and native playback. Automated tests never send real messages.
 
-A startup capture revealed the system's default white launch screen before the dark introduction. Build 4 adds an explicit black launch color asset and dark appearance. A subsequent capture during launch shows a black app surface; the settled first-launch screen remains the color picker. The Release Info.plist and compiled asset catalog were checked as well.
+## Sign-in
 
-The production adapter runs in actual WebKit with synthetic responses. Coverage includes Following-only filtering, paid partnerships/ads, Reels/recommendation exclusions, malformed schemas, restricted media URLs, explicit feed/inbox/thread pagination, accepted and opened recipient membership, sender alignment, bounded text encoding, acknowledgement validation, duplicate-send prevention and rate limits. These tests never send real messages.
+The entry now opens Instagram authentication directly. Cancel returns to the entry and invalidates pending checks. Opening a page, finding a cookie or receiving a late response cannot establish sign-in. Successful authenticated verification opens the native app automatically. Connectivity failures have explicit retry paths.
 
-Client-state tests cover retained content after failed refresh/pagination, per-tab error isolation, late responses after session closure, the unresolved-send journal across restart, validation, duplicate taps and server-directed cooldown. The journal test proves that message bodies are absent from persisted attempt records.
+The saved-session investigation reproduced a cold WebKit store returning zero cookies even while the existing session still worked through the local transport. A local-only adapter probe now initializes WebKit and returns a presence hint without an Instagram request. Verification uses a bounded authenticated inbox GET and returns no conversation content to native code. The account-profile endpoint considered during development was unavailable and is not used by the final implementation.
 
-The fictional UI journeys cover separate navigation, large-text navigation, session finish, failed refresh with retained content, the native keyboard/composer, acknowledged sending, disabled repeat sends and reconciliation after an uncertain result. The final fictional composer screenshot was visually inspected and is published in `docs/images/fictional-composer.png`.
+Synthetic connection tests cover immediate sign-in, incomplete authentication, cancellation, late success after cancellation, expired sessions, server verification, failures without automatic retries, and recovery when a new sign-in follows a connectivity failure. Adapter fixtures prove that the local hint makes no request and that malformed/unauthenticated responses cannot masquerade as a successful session.
 
-Native AVPlayer tests prove time progression with a generated local video, stopping/releasing the player, and recovery from an invalid asset without a permanent spinner.
+The signed-out simulator journey starts at color selection, taps the actual entry button, reaches Instagram's secure password field, cancels back to the entry, and opens a new functioning sign-in view. It does not enter credentials. The final clean-build PorchLiveCheck passed its one UI journey on iPhone 17e: `artifacts/private/verified-sign-in.xcresult`. [Signed-out form](docs/images/sign-in.png). The shared Xcode cache had unexpectedly run an old login-page-only test; the final checks were rebuilt in a separate directory, and that stale run is not counted as journey evidence.
 
-## Read-only Instagram integration
+## Read-only account integration
 
-On build 2, the opt-in PorchAccountCheck suite passed **2 tests**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-PorchAccountCheck-2026.09.10_12-47-40--0400.xcresult`. The appearance changes did not exercise the live account again.
+Build 7's opt-in **PorchAccountCheck passed 3 tests** on iPhone 17 Pro. Final clean-build result: `artifacts/private/verified-account.xcresult`.
 
-The existing signed-in account returned **3 Following posts, 1 followed story group containing 1 media item, and 0 accepted inbox threads**, with no adapter error. A real Instagram video loaded as playable and advanced at least 0.75 seconds through AVPlayer's asynchronous time observer. This replaces the earlier unsuccessful synchronous playback probe; audio output is not established by this muted check.
+The tests verify saved-session discovery before content loading, an actual authenticated verification request, and the user-facing path from color selection through **Open Porch** into native Feed, Stories and inbox. The existing account supplies real posts and an active story group with two media items. A real video loaded as playable and advanced through AVPlayer. The accepted inbox was empty, so this check does not establish message rendering with real conversation content. Reading surfaces contain no web view. No follows, likes, posts, sends or seen-marker requests were performed. Private screenshots and result bundles remain excluded from git.
 
-The UI journey opens and closes a story, switches among separate native Feed, Stories and inbox views, and verifies that reading screens contain no web view. Real media rendering was inspected privately. An earlier UI assertion expected every story preview to be an accessibility Image; the video preview exposes a Play button. The corrected assertion accepts the photo or actionable video preview. No follows, likes, posts, messages or seen-marker requests were performed. Private account screenshots and raw result bundles remain excluded from git.
+This establishes the existing session's restoration path. It does not establish a newly entered password, account challenge, 2FA flow or physical-phone login.
 
-The fresh, signed-out PorchLiveCheck passed **1 test** on a separate iPhone 17e / iOS 26.5 simulator. It verified Instagram's login page and secure password field without entering credentials or disturbing the signed-in simulator. Local result: `Test-PorchLiveCheck-2026.09.10_12-40-39--0400.xcresult`. This proves form reachability, not completion of login, challenges or 2FA.
+## Device and Release
 
-## Physical device and Release
+Build 7 was signed and installed on the paired iPhone 14 Pro Max. The phone was locked and refused launch, so physical interaction with this build remains unverified. The installation log is private at `artifacts/private/readable-device.log`.
 
-Build 2 was signed, installed and launched on the paired iPhone 14 Pro Max. That physical-device suite passed **4 tests**: both local playback tests and both fictional composer/recovery UI journeys. Private result: `artifacts/private/uat-device.xcresult`. These checks use no Instagram requests and establish neither live delivery nor account login on the phone.
+The unsigned device Release archive succeeded at `.build-uat/Porch.xcarchive`; its version/build are 0.2/7. Debug fixture and authentication-bypass launch flags are absent from the Release executable. Signing/distribution remain with the operator’s homegrown workflow. Earlier build 2 had four passing physical-device playback and fictional-composer checks; those are historical evidence, not acceptance of build 7.
 
-Builds 3 and 4 were signed and installed on the same phone. Launch was refused because the phone was locked, so the new introduction has simulator interaction evidence only. The local install helper initially selected an XCTest runner left in the build directory. Its application selection was corrected and fixture-tested to exclude test runners and refuse ambiguous app products; the subsequent installs selected `dev.alex.porch` correctly.
+## Before friend UAT
 
-Build 5 was signed, installed and successfully launched on that iPhone. Its appearance was inspected in the simulator; no additional physical-device account or interaction checks were performed.
+- Complete fresh sign-in on the physical phone, including any account challenge or 2FA that Instagram presents. External providers such as Facebook are not supported by this sign-in view.
+- Verify one explicitly authorized real text send and a reply in a populated conversation. Fixture acknowledgement does not prove live delivery. No real DM was sent during this iteration.
+- Check audible playback, background/foreground behavior, and the operator's chosen Release installation workflow.
+- Obtain hands-on review of the larger, centered layout. Passing tests and screenshots do not substitute for that review.
 
-Build 6 was signed and installed on the same iPhone. The phone was locked, so launch was refused and the new scale has simulator interaction evidence only.
-
-`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 6 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
-
-## Remaining acceptance
-
-- A populated real conversation, one explicitly authorized text send and a received reply remain unverified. Fixture acknowledgements are not delivery evidence. Sending is limited to existing accepted conversations; non-text attachments are descriptive placeholders.
-- Complete account login/challenge/2FA on the physical phone, audible video, live background/foreground behavior, and installation through the chosen homegrown Release workflow remain to be accepted.
-- Pagination and mixed-media variants have fixture coverage, not exhaustive live coverage. Instagram's unofficial routes and experiments may change or reject requests. Excluded or unknown content may be omitted.
-- This is an experimental source release. These passing checks do not establish production readiness or full Instagram compatibility. The friend testing journey is in [docs/UAT.md](docs/UAT.md).
+Instagram's unofficial routes and response shapes can change. This remains an experimental source release. The proposed friend journey is in [docs/UAT.md](docs/UAT.md).
