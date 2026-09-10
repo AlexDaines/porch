@@ -36,10 +36,10 @@ struct NativeFeed: View {
     var refresh: (() async -> Void)?
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
+            LazyVStack(spacing: 16) {
                 ForEach(posts) { post in NativePostCard(post: post) }
                 if posts.isEmpty {
-                    Text("No posts.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top, 40)
+                    Text("No posts.").font(PorchTheme.body).foregroundStyle(PorchTheme.muted).padding(.top, 40)
                 }
                 if let moreError, let more, moreError != "signIn" {
                     LoadFailure(code:moreError,retry:{
@@ -48,7 +48,7 @@ struct NativeFeed: View {
                 }
                 if moreLoading { ProgressView().accessibilityLabel("Loading more posts") }
                 if hasMore, let more {
-                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.8).frame(minHeight:44).padding(.vertical,16).disabled(moreLoading)
+                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.4).frame(minHeight:44).padding(.vertical,16).disabled(moreLoading)
                 } else if !posts.isEmpty {
                     Eyebrow(text:reachedSessionLimit ? "Session limit reached. Reload to start again." : "No more posts").padding(.vertical, 24)
                 }
@@ -63,15 +63,15 @@ struct NativePostCard: View {
     @State private var expanded = false
     @State private var selectedImage = 0
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(post.username).font(.headline)
+                Text(post.username).font(PorchTheme.title)
                 Spacer()
                 if post.timestamp > 0 {
                     Text(Date(timeIntervalSince1970: post.timestamp), format: .dateTime.month(.abbreviated).day())
                         .font(PorchTheme.utility).foregroundStyle(PorchTheme.muted)
                 }
-            }.padding(.horizontal, 20).padding(.top, 20)
+            }.padding(.horizontal, 20).padding(.top, 12)
             if post.media.count == 1, let media = post.media.first {
                 NativeMedia(media: media)
             } else if !post.media.isEmpty {
@@ -84,7 +84,7 @@ struct NativePostCard: View {
                     .foregroundStyle(PorchTheme.muted).padding(.horizontal, 20)
             }
             if !post.caption.isEmpty {
-                Text(post.caption).font(.subheadline).lineSpacing(3)
+                Text(post.caption).font(PorchTheme.body).lineSpacing(3)
                     .lineLimit(expanded ? nil : 4).padding(.horizontal, 20)
                 if !expanded && post.caption.count > 220 {
                     Button("MORE") { expanded = true }.font(PorchTheme.utility)
@@ -112,15 +112,15 @@ struct NativeMedia: View {
                 NativePostImage(media: media, maxHeight: maxHeight)
                 if let url = media.videoURL {
                     VStack(spacing: 12) {
-                        if playback.state == .failed { Text("Couldn't play this video.").font(.subheadline).padding(8).background(PorchTheme.canvas) }
+                        if playback.state == .failed { Text("Couldn't play this video.").font(PorchTheme.body).padding(8).background(PorchTheme.canvas) }
                         Button { playback.start(url) } label: {
-                            Image(systemName: playback.state == .failed ? "arrow.clockwise" : "play.fill").font(.title2).padding(20)
+                            Image(systemName: playback.state == .failed ? "arrow.clockwise" : "play.fill").font(PorchTheme.body).frame(width:44,height:44)
                                 .background(PorchTheme.canvas.opacity(0.85), in: Rectangle())
                         }.accessibilityLabel(playback.state == .failed ? "Retry video" : "Play video")
                             .accessibilityHint(media.alt?.isEmpty == false ? media.alt! : "Video preview")
                     }
                 } else if media.isVideo == true {
-                    Text("Video unavailable").font(.caption).padding(10).background(PorchTheme.canvas)
+                    Text("Video unavailable").font(PorchTheme.detail).padding(10).background(PorchTheme.canvas)
                 }
             }
         }

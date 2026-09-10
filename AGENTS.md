@@ -1,5 +1,7 @@
 # Working on Porch
 
+The user wants things to feel small and minimal, like the Light Phone. Use the compact PorchTheme text tokens: 13-point default titles/body, 12-point details and 11-point regular utility labels, all responsive to Dynamic Type. Keep visible swatches at 20 points, default avatars at 28 points, and actual button/row tap areas at least 44 points. Use compact text actions rather than oversized headings or full-width accent-filled buttons. The introduction groups its prompt, square colors and Continue together; explanatory copy belongs in Settings.
+
 All Porch interface shapes have sharp corners. Color swatches and their selection outlines are squares, as are story avatars; media, buttons, text fields and presentation surfaces have no rounding. Use porchSheet() for app sheets, plain controls and inline confirmations. Do not introduce circles, capsules, rounded cards or default toolbar button backgrounds. Instagram's authentication page and OS-owned interfaces retain their own controls.
 
 Porch is a free, experimental native iOS Instagram client. Read DESIGN.md and VERIFICATION.md for the current architecture and evidence. The user explicitly replaced the earlier page-pruning approach with direct authenticated data requests and native rendering. Do not restore the browser-filter architecture.

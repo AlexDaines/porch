@@ -27,12 +27,12 @@ struct SampleFeed: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 10) {
-                    Text("maya.kim").font(.headline)
+                    Text("maya.kim").font(PorchTheme.title)
                     Spacer()
                     Eyebrow(text: "2h")
-                }.padding(.horizontal, 20).padding(.top, 20).padding(.bottom, 12)
+                }.padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 10)
                 SampleLandscape(height: 320)
-                Text("Took the long way home.").font(.subheadline).padding(.horizontal, 20).padding(.vertical, 16)
+                Text("Took the long way home.").font(PorchTheme.body).padding(.horizontal, 20).padding(.vertical, 12)
                 PorchRule().padding(.horizontal, 20)
                 HStack {
                     Eyebrow(text: "Caught up")
@@ -51,12 +51,12 @@ struct SampleStories: View {
             VStack(spacing: 0) {
                 ForEach(0..<4) { index in
                     Button { story = index } label: {
-                        HStack(spacing: 14) {
-                            Avatar(initials: SampleContent.initials[index], size: 44, story: true)
-                            Text(SampleContent.names[index]).font(.headline)
+                        HStack(spacing: 12) {
+                            Avatar(initials: SampleContent.initials[index], story: true)
+                            Text(SampleContent.names[index]).font(PorchTheme.title)
                             Spacer()
-                            Image(systemName: "arrow.up.right").font(.caption).foregroundStyle(PorchTheme.muted)
-                        }.padding(.vertical, 16).contentShape(Rectangle())
+                            Image(systemName: "arrow.up.right").font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                        }.frame(minHeight: 44).padding(.vertical, 6).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityLabel("\(SampleContent.names[index])'s sample story")
                     PorchRule()
                 }
@@ -71,19 +71,19 @@ struct SampleStory: View {
     init(start: Int) { _current = State(initialValue: start) }
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text(SampleContent.names[current]).font(.headline)
+                    Text(SampleContent.names[current]).font(PorchTheme.title)
                     Spacer()
                     Eyebrow(text: "Sample · \(current + 1)/4")
                     Button("CLOSE") { dismiss() }.font(PorchTheme.utility).frame(minWidth: 44, minHeight: 44)
                         .foregroundStyle(accent).accessibilityLabel("Close")
                 }
                 SampleLandscape(height: 400)
-                Text(["Somewhere with no agenda.", "A good day to take the scenic route.", "Wish you were here.", "See you when we're back."][current]).font(.body)
+                Text(["Somewhere with no agenda.", "A good day to take the scenic route.", "Wish you were here.", "See you when we're back."][current]).font(PorchTheme.body)
                 Button(current == 3 ? "DONE" : "NEXT") {
                     if current == 3 { dismiss() } else { current += 1 }
-                }.buttonStyle(PorchButtonStyle(filled: false))
+                }.buttonStyle(PorchButtonStyle())
                     .accessibilityLabel(current == 3 ? "All done" : "Next story")
             }.padding(20)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet()
@@ -100,24 +100,24 @@ struct SampleInbox: View {
                     Button { selected = index } label: {
                         HStack(spacing: 14) {
                             VStack(alignment: .leading, spacing: 5) {
-                                Text(SampleContent.names[index]).font(.headline)
-                                Text(messages[index]).font(.subheadline).foregroundStyle(PorchTheme.muted).multilineTextAlignment(.leading)
+                                Text(SampleContent.names[index]).font(PorchTheme.title)
+                                Text(messages[index]).font(PorchTheme.body).foregroundStyle(PorchTheme.muted).multilineTextAlignment(.leading)
                             }
                             Spacer(minLength: 0)
-                        }.padding(.vertical, 18).contentShape(Rectangle())
+                        }.frame(minHeight: 44).padding(.vertical, 8).contentShape(Rectangle())
                     }.buttonStyle(.plain)
                     PorchRule()
                 }
             }.padding(.horizontal, 20)
         }.sheet(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
-            VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Text(SampleContent.names[selected ?? 0]).font(.headline)
+                    Text(SampleContent.names[selected ?? 0]).font(PorchTheme.title)
                     Spacer()
                     Button("CLOSE") { selected = nil }.font(PorchTheme.utility).foregroundStyle(accent).frame(minHeight: 44)
                 }
                 PorchRule()
-                Text(messages[selected ?? 0]).font(.body)
+                Text(messages[selected ?? 0]).font(PorchTheme.body)
                 Eyebrow(text: "Sample · sending unavailable")
             }.padding(20).presentationDetents([.medium]).porchSheet().foregroundStyle(PorchTheme.bone)
         }

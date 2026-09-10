@@ -25,7 +25,7 @@ struct ContentView: View {
                 case .sample, .instagram: session
                 }
             }
-        }.foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent).buttonStyle(.plain)
+        }.font(PorchTheme.body).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark).tint(accent).buttonStyle(.plain)
             .sheet(isPresented:$model.showSettings) { SettingsView(model:model,browser:browser,client:client,colorSelection:colorSelection) }
             .sheet(isPresented:$showSignIn,onDismiss:{
                 browser.suspend(); client.close()
@@ -57,7 +57,7 @@ struct ContentView: View {
                     tabControls
                     HStack { Spacer(minLength: 0); sessionTools }
                 }
-            }.padding(.leading,20).padding(.trailing,8).padding(.bottom,8)
+            }.padding(.leading,20).padding(.trailing,8).padding(.bottom,4)
             PorchRule()
             if model.mode == .sample {
                 switch model.tab {
@@ -71,13 +71,13 @@ struct ContentView: View {
     @ViewBuilder private var tabControls: some View {
         ForEach([PorchModel.Tab.feed,.stories,.messages],id:\.self) { tab in
             Button { model.tab = tab } label: {
-                Text(tab.rawValue.uppercased()).font(PorchTheme.utility).tracking(0.8)
+                Text(tab.rawValue.uppercased()).font(PorchTheme.utility).tracking(0.4)
                     .foregroundStyle(model.tab == tab ? accent : PorchTheme.muted)
                     .fixedSize(horizontal:true,vertical:false)
                     .frame(minWidth:44,minHeight:44,alignment:.leading)
                     .padding(.bottom,4)
                     .overlay(alignment:.bottomLeading) {
-                        if model.tab == tab { Rectangle().fill(accent).frame(width:32,height:2) }
+                        if model.tab == tab { Rectangle().fill(accent).frame(width:24,height:1) }
                     }
                     .contentShape(Rectangle())
             }.buttonStyle(.plain).accessibilityLabel(tab.rawValue)
@@ -89,7 +89,7 @@ struct ContentView: View {
         HStack(spacing:0) {
             if model.mode == .sample { Eyebrow(text:"Sample").fixedSize() }
             Button { model.showSettings = true } label: {
-                Image(systemName:"ellipsis").font(.system(size:18)).foregroundStyle(PorchTheme.muted).frame(width:44,height:44)
+                Image(systemName:"ellipsis").font(.system(size:14)).foregroundStyle(PorchTheme.muted).frame(width:44,height:44)
             }.accessibilityLabel("Settings").accessibilityIdentifier("settings")
         }
     }

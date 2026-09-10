@@ -8,7 +8,9 @@ Every Porch interface shape has sharp corners. Swatches, selection outlines, ava
 
 ## Color introduction
 
-The first launch asks only “Choose a color.” Five named square swatches, a selected checkmark and Continue sit on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
+The user's [Light Phone](https://www.thelightphone.com/) reference informs the small visual scale: 13-point default titles and body, 12-point details and 11-point regular monospaced utilities. These use native Dynamic Type text styles so accessibility settings still enlarge them. Story avatars are 28 points by default and scale with their initials. Navigation uses a 24-point-wide, one-point-high selection rule. Names use medium weight; reading copy remains regular. Compact text actions replace large filled buttons. Tighter rows leave space around the content without turning labels into headings.
+
+The first launch asks only “Choose a color.” Five 20-point square swatches, a selected checkmark and a small Continue action form one compact group on the black canvas. Sage is preselected so the user can continue without making a decision. There are no timers, automatic transitions, notifications, permissions or Instagram requests in this introduction. Its completion and the chosen color are stored locally. Settings → Color offers the same choices and applies changes immediately to navigation, actions and the native composer. The choice survives session finish and clearing Instagram sign-in.
 
 | Choice | Accent |
 | --- | --- |
@@ -20,7 +22,7 @@ The first launch asks only “Choose a color.” Five named square swatches, a s
 
 These are design choices informed by research, not validated therapeutic colors. [Wilms and Oberfeld](https://doi.org/10.1007/s00426-017-0880-8) found that saturation and brightness, as well as hue, affected arousal in their display experiment; blue and green elicited lower arousal ratings than red. That finding informs the muted blue/green options, but does not validate these exact hex values or establish addiction outcomes. Lilac and Sand broaden personal preference. [Jonauskaite and colleagues](https://doi.org/10.1177/0956797620948810) found shared color-emotion associations alongside linguistic/geographic differences. The interface makes no universal calming claim.
 
-Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised surface. Color is accompanied by labels and a checkmark, with a minimum 48 × 56-point swatch target. The page scrolls when larger text needs more room. Existing reading layout and original media colors remain intact.
+Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised surface. Color is accompanied by labels and a checkmark. Each small swatch has a separate 44 × 44-point tap target; text actions and rows also preserve at least 44 points. The page scrolls when larger text needs more room. Original media sizes and colors remain intact.
 
 The system launch screen uses an explicit black color asset and dark appearance, matching the native canvas before SwiftUI loads. [Apple's launch-background key](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen/uicolorname) otherwise defaults to the device's system background; that produced a white startup flash on a device using light appearance.
 

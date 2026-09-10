@@ -6,7 +6,7 @@ struct LoadFailure: View {
     var actionTitle: String? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(Self.message(code)).font(.subheadline).foregroundStyle(PorchTheme.muted)
+            Text(Self.message(code)).font(PorchTheme.body).foregroundStyle(PorchTheme.muted)
             Button(actionTitle ?? (code == "signIn" ? "SIGN IN" : "TRY AGAIN"), action: retry)
                 .font(PorchTheme.utility).frame(minHeight: 44)
         }.frame(maxWidth: .infinity, alignment: .leading).padding(20)

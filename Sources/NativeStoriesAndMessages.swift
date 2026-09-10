@@ -9,16 +9,16 @@ struct NativeStories: View {
             VStack(spacing:0) {
                 ForEach(people) { person in
                     Button { selected = person } label: {
-                        HStack(spacing:16) {
+                        HStack(spacing:12) {
                             Avatar(initials:String(person.username.prefix(2)).uppercased(),story:true)
-                            Text(person.username).font(.headline)
+                            Text(person.username).font(PorchTheme.title)
                             Spacer()
-                            Image(systemName:"arrow.up.right").font(.caption).foregroundStyle(PorchTheme.muted)
-                        }.padding(.vertical,16).contentShape(Rectangle())
+                            Image(systemName:"arrow.up.right").font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                        }.frame(minHeight:44).padding(.vertical,6).contentShape(Rectangle())
                     }.buttonStyle(.plain).accessibilityLabel("\(person.username)'s story")
                     PorchRule()
                 }
-                if people.isEmpty { Text("No stories.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top,40) }
+                if people.isEmpty { Text("No stories.").font(PorchTheme.body).foregroundStyle(PorchTheme.muted).padding(.top,40) }
             }.padding(.horizontal,20)
         }.accessibilityIdentifier("native-stories").refreshable { await client.load(.stories,refresh:true) }
             .sheet(item:$selected) { person in NativeStoryViewer(person:person,client:client) }
@@ -37,9 +37,9 @@ struct NativeStoryViewer: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(spacing:20) {
+                VStack(spacing:12) {
                     HStack {
-                        Text(person.username).font(.headline)
+                        Text(person.username).font(PorchTheme.title)
                         Spacer()
                         Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close story")
                     }
@@ -83,9 +83,9 @@ struct NativeInbox: View {
                 ForEach(threads) { thread in
                     Button { selected = thread } label: {
                         VStack(alignment:.leading,spacing:6) {
-                            Text(thread.title).font(.headline)
-                            if !thread.preview.isEmpty { Text(thread.preview).font(.subheadline).foregroundStyle(PorchTheme.muted).lineLimit(1) }
-                        }.frame(maxWidth:.infinity,alignment:.leading).padding(.vertical,18).contentShape(Rectangle())
+                            Text(thread.title).font(PorchTheme.title)
+                            if !thread.preview.isEmpty { Text(thread.preview).font(PorchTheme.body).foregroundStyle(PorchTheme.muted).lineLimit(1) }
+                        }.frame(maxWidth:.infinity,minHeight:44,alignment:.leading).padding(.vertical,8).contentShape(Rectangle())
                     }.buttonStyle(.plain)
                     PorchRule()
                 }
@@ -96,7 +96,7 @@ struct NativeInbox: View {
                 }
                 if client.inboxLoadingMore { ProgressView().padding(16) }
                 if threads.count >= 200 { Eyebrow(text:"200 conversations loaded. Reload to start again.").padding(.vertical,16) }
-                if threads.isEmpty { Text("No messages.").font(.subheadline).foregroundStyle(PorchTheme.muted).padding(.top,40) }
+                if threads.isEmpty { Text("No messages.").font(PorchTheme.body).foregroundStyle(PorchTheme.muted).padding(.top,40) }
             }.padding(.horizontal,20)
         }.accessibilityIdentifier("native-inbox").refreshable { await client.load(.messages,refresh:true) }
             .sheet(item:$selected) { thread in NativeConversation(thread:thread,client:client) }
@@ -123,14 +123,14 @@ struct NativeConversation: View {
     var body: some View {
         VStack(spacing:0) {
             HStack {
-                Text(thread.title).font(.headline)
+                Text(thread.title).font(PorchTheme.title)
                 Spacer()
                 Button { dismiss() } label: { Image(systemName:"xmark").frame(width:44,height:44) }.accessibilityLabel("Close conversation")
             }.padding(.horizontal,20)
             PorchRule()
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(alignment:.leading,spacing:16) {
+                    LazyVStack(alignment:.leading,spacing:12) {
                         if let error { LoadFailure(code:error,retry:{ if error == "signIn" { dismiss() } else { Task { await load() } } },actionTitle:error == "signIn" ? "CLOSE CONVERSATION" : nil) }
                         if hasOlder && messages.count < 200 {
                             Button("EARLIER MESSAGES") { Task { await load(older:true) } }
@@ -140,7 +140,7 @@ struct NativeConversation: View {
                         ForEach(messages) { message in
                             VStack(alignment:message.mine ? .trailing : .leading,spacing:4) {
                             if !message.mine, let sender = message.sender { Text(sender).font(PorchTheme.utility).foregroundStyle(PorchTheme.muted) }
-                            Text(message.text).font(.body).textSelection(.enabled).padding(12)
+                            Text(message.text).font(PorchTheme.body).textSelection(.enabled).padding(10)
                                 .background(message.mine ? PorchTheme.surface : .clear)
                                 .frame(maxWidth:.infinity,alignment:message.mine ? .trailing : .leading)
                                 .accessibilityLabel(message.mine ? "You: \(message.text)" : message.text)
@@ -160,19 +160,20 @@ struct NativeConversation: View {
                                 client.resolveSend(thread.id); draft = ""; sendError = nil; confirmUnlock = false
                             }, cancel: { confirmUnlock = false })
                     } else {
-                        Text(LoadFailure.message("sendUnconfirmed")).font(.footnote).foregroundStyle(PorchTheme.muted)
+                        Text(LoadFailure.message("sendUnconfirmed")).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
                         HStack {
                             Button("Check conversation") { Task { await load() } }.disabled(loading)
                             Spacer()
                             Button("I checked") { confirmUnlock = true }
-                        }.font(.footnote).frame(minHeight:44)
+                        }.font(PorchTheme.detail).frame(minHeight:44)
                     }
                 } else if let sendError {
-                    Text(LoadFailure.message(sendError)).font(.footnote).foregroundStyle(PorchTheme.muted)
+                    Text(LoadFailure.message(sendError)).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
                 } else if sent { Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).accessibilityIdentifier("message-sent") }
                 HStack(alignment:.bottom,spacing:12) {
-                    TextField("Message",text:$draft,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(.body).lineLimit(1...4)
-                        .textFieldStyle(.plain).padding(12).background(PorchTheme.surface).accessibilityIdentifier("message-draft")
+                    TextField("Message",text:$draft,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(PorchTheme.body).lineLimit(1...4)
+                        .textFieldStyle(.plain).padding(.horizontal,10).padding(.vertical,8).frame(minHeight:44)
+                        .background(PorchTheme.surface).accessibilityIdentifier("message-draft")
                     Button {
                         let text = draft
                         sent = false; sendError = nil
@@ -186,12 +187,12 @@ struct NativeConversation: View {
                         }
                     } label: {
                         if sending { ProgressView().frame(width:44,height:44) }
-                        else { Image(systemName:"arrow.up").font(.body.weight(.semibold)).frame(width:44,height:44) }
+                        else { Image(systemName:"arrow.up").font(PorchTheme.body).frame(width:44,height:44) }
                     }.disabled(!validDraft || sending || unconfirmed || loading || error != nil)
                         .foregroundStyle(validDraft && !sending && !unconfirmed && !loading && error == nil ? accent : PorchTheme.muted)
                         .accessibilityLabel("Send message").accessibilityIdentifier("send-message")
                 }
-                if draft.utf16.count > 1000 { Text("Up to 1,000 characters.").font(.footnote).foregroundStyle(PorchTheme.muted) }
+                if draft.utf16.count > 1000 { Text("Up to 1,000 characters.").font(PorchTheme.detail).foregroundStyle(PorchTheme.muted) }
             }.padding(16)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
             .porchSheet().interactiveDismissDisabled(sending)

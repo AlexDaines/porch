@@ -1,10 +1,12 @@
 # Verification
 
-September 10, 2026. Porch **0.2 (5)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 10, 2026. Porch **0.2 (6)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
 
 ## Simulator regression
 
-The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-34-00--0400.xcresult`.
+The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-55-06--0400.xcresult`.
+
+Build 6 reduces the default scale to 13-point title/body, 12-point details and 11-point regular utilities. Swatches are 20 points inside 44-point tap areas; avatars are 28 points and scale with Dynamic Type. Compact text actions replace filled entry buttons and the introduction's full-width action. The standard introduction, maximum-text introduction, entry links, story rows, expanded Settings and fictional composer were visually inspected. The first review caught centered entry links and Settings swatches; both now align to the left margin, with the corrected screenshots reviewed and the suite rerun successfully. Color persistence, large-text navigation and cancellation/send recovery remain covered by the same offline journeys.
 
 Build 5 applies the user's sharp-corner rule to swatches, selection outlines, story avatars, play-button backgrounds and app sheets. Settings uses a plain header and confirmations appear inline. The introduction, largest-text introduction, expanded color settings, stories, sample conversation, clear-sign-in confirmation and fictional native composer were visually inspected. The existing UI journeys now also verify that cancelling sign-in clearing retains the session, and cancelling the unresolved-send confirmation preserves the draft and send block. Only fictional transport was used for sending checks. [Color settings screenshot](docs/images/color-settings.png).
 
@@ -38,7 +40,9 @@ Builds 3 and 4 were signed and installed on the same phone. Launch was refused b
 
 Build 5 was signed, installed and successfully launched on that iPhone. Its appearance was inspected in the simulator; no additional physical-device account or interaction checks were performed.
 
-`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 5 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
+Build 6 was signed and installed on the same iPhone. The phone was locked, so launch was refused and the new scale has simulator interaction evidence only.
+
+`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 6 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
 
 ## Remaining acceptance
 

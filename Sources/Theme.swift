@@ -7,7 +7,11 @@ enum PorchTheme {
     static let bone = Color(hex: 0xE9E4D6)
     static let muted = Color(hex: 0x8A8375)
     static let line = Color(hex: 0x26231F)
-    static let utility = Font.system(.caption2, design: .monospaced).weight(.semibold)
+    // Native text styles keep the smaller default scale responsive to Dynamic Type.
+    static let title = Font.system(.footnote).weight(.medium)
+    static let body = Font.system(.footnote)
+    static let detail = Font.system(.caption)
+    static let utility = Font.system(.caption2, design: .monospaced)
 }
 
 enum PorchColor: String, CaseIterable, Identifiable {
@@ -63,27 +67,26 @@ extension Color {
 }
 struct PorchButtonStyle: ButtonStyle {
     @Environment(\.porchAccent) private var accent
-    var filled = true
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.system(.headline, design: .monospaced).weight(.bold))
-            .frame(maxWidth: .infinity, minHeight: 50)
-            .foregroundStyle(filled ? PorchTheme.canvas : accent)
-            .background(filled ? accent : PorchTheme.canvas)
+        configuration.label.font(PorchTheme.body)
+            .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .foregroundStyle(accent)
             .opacity(configuration.isPressed ? 0.75 : 1)
     }
 }
 struct Eyebrow: View {
     let text: String
     var body: some View {
-        Text(text.uppercased()).font(PorchTheme.utility).tracking(1.2).foregroundStyle(PorchTheme.muted)
+        Text(text.uppercased()).font(PorchTheme.utility).tracking(0.4).foregroundStyle(PorchTheme.muted)
     }
 }
 struct Avatar: View {
     let initials: String
-    var size: CGFloat = 44
+    @ScaledMetric(relativeTo: .caption2) private var size: CGFloat = 28
     var story = false
     var body: some View {
-        Text(initials).font(.system(size: size * 0.28, weight: .medium, design: .monospaced))
+        Text(initials).font(PorchTheme.utility)
             .foregroundStyle(PorchTheme.bone).frame(width: size, height: size)
             .overlay(Rectangle().stroke(story ? PorchTheme.muted : PorchTheme.line, lineWidth: 1))
     }
@@ -98,6 +101,7 @@ extension View {
             .presentationDragIndicator(.hidden)
             .presentationBackground(PorchTheme.canvas)
             .preferredColorScheme(.dark)
+            .font(PorchTheme.body)
             .buttonStyle(.plain)
     }
 }
@@ -112,8 +116,8 @@ struct PorchConfirmation: View {
     let cancel: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline).accessibilityAddTraits(.isHeader)
-            Text(message).font(.footnote).foregroundStyle(PorchTheme.muted)
+            Text(title).font(PorchTheme.title).accessibilityAddTraits(.isHeader)
+            Text(message).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
             ViewThatFits(in: .horizontal) {
                 HStack { actions }.fixedSize(horizontal: true, vertical: false)
                 VStack(alignment: .leading, spacing: 0) { actions }

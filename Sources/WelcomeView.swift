@@ -6,17 +6,15 @@ struct WelcomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                HStack { Text("Porch").font(.headline); Spacer() }
-                    .frame(height: 44).padding(.bottom, 28)
+                Text("Porch").font(PorchTheme.title)
+                    .frame(minHeight: 44).padding(.bottom, 16)
                 Button(action: connect) {
-                    HStack { Text("Open Instagram"); Spacer(); Image(systemName: "arrow.right") }.padding(.horizontal, 16)
+                    HStack(spacing: 8) { Text("Open Instagram"); Image(systemName: "arrow.right").font(PorchTheme.detail) }
                 }.buttonStyle(PorchButtonStyle()).accessibilityIdentifier("connect")
-                Text("An independent, experimental Instagram client.")
-                    .font(.footnote).foregroundStyle(PorchTheme.muted).padding(.top, 12)
                 Button("Sample", action: sample)
-                    .font(.subheadline).foregroundStyle(PorchTheme.muted)
-                    .frame(minHeight: 44, alignment: .leading).padding(.top, 18).accessibilityIdentifier("sample")
-            }.padding(.horizontal, 20).padding(.top, 8)
+                    .font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading).accessibilityIdentifier("sample")
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20).padding(.top, 8)
         }
     }
 }

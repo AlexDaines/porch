@@ -66,7 +66,7 @@ struct InstagramSignIn: View {
     var body: some View {
         VStack(spacing:0) {
             HStack {
-                Text("instagram.com").font(.subheadline)
+                Text("instagram.com").font(PorchTheme.body)
                 Spacer()
                 Button("Done") { dismiss() }.frame(minHeight:44)
             }.padding(.horizontal,16)
