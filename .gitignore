@@ -1,0 +1,10 @@
+.build-ios/
+.build-mac/
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+.DS_Store
+node_modules/
+test-results/
+*.xcresult/
+artifacts/private/
