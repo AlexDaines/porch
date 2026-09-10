@@ -20,6 +20,8 @@ These are design choices informed by research, not validated therapeutic colors.
 
 Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised surface. Color is accompanied by labels and a checkmark, with a minimum 48 × 56-point swatch target. The page scrolls when larger text needs more room. Existing reading layout and original media colors remain intact.
 
+The system launch screen uses an explicit black color asset and dark appearance, matching the native canvas before SwiftUI loads. [Apple's launch-background key](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen/uicolorname) otherwise defaults to the device's system background; that produced a white startup flash on a device using light appearance.
+
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
 
 ## Data path

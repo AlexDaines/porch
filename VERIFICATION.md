@@ -1,12 +1,14 @@
 # Verification
 
-September 10, 2026. Porch **0.2 (3)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 10, 2026. Porch **0.2 (4)**. Xcode 26.6 / Swift 6.3.3. Deployment target iOS 18; iOS 18 itself has not been tested.
 
 ## Simulator regression
 
 The offline Porch suite passed **22 test definitions / 38 expanded cases**, with no failures, on iPhone 17 Pro / iOS 26.5. Local result: `Test-Porch-2026.09.10_13-06-50--0400.xcresult`.
 
 The color introduction journey verifies first launch without a web view, selecting Mist, continuing, changing to Lilac in Settings, persistence through restart, no repeated introduction, all five swatches at the largest accessibility text size and continuing with the default color. The introduction, colored sample feed and expanded Settings were visually inspected. An inherited accessibility identifier initially shadowed the Settings swatch identifiers; removing it and querying the visible disclosure label resolved the failed test. A duplicate selected-color label in expanded Settings was removed after visual review.
+
+A startup capture revealed the system's default white launch screen before the dark introduction. Build 4 adds an explicit black launch color asset and dark appearance. A subsequent capture during launch shows a black app surface; the settled first-launch screen remains the color picker. The Release Info.plist and compiled asset catalog were checked as well.
 
 The production adapter runs in actual WebKit with synthetic responses. Coverage includes Following-only filtering, paid partnerships/ads, Reels/recommendation exclusions, malformed schemas, restricted media URLs, explicit feed/inbox/thread pagination, accepted and opened recipient membership, sender alignment, bounded text encoding, acknowledgement validation, duplicate-send prevention and rate limits. These tests never send real messages.
 
@@ -30,9 +32,9 @@ The fresh, signed-out PorchLiveCheck passed **1 test** on a separate iPhone 17e 
 
 Build 2 was signed, installed and launched on the paired iPhone 14 Pro Max. That physical-device suite passed **4 tests**: both local playback tests and both fictional composer/recovery UI journeys. Private result: `artifacts/private/uat-device.xcresult`. These checks use no Instagram requests and establish neither live delivery nor account login on the phone.
 
-Build 3 was signed and installed on the same phone. Launch was refused because the phone was locked, so the new introduction has simulator interaction evidence only. The local install helper initially selected an XCTest runner left in the build directory. Its application selection was corrected and fixture-tested to exclude test runners and refuse ambiguous app products; the subsequent install selected `dev.alex.porch` correctly.
+Builds 3 and 4 were signed and installed on the same phone. Launch was refused because the phone was locked, so the new introduction has simulator interaction evidence only. The local install helper initially selected an XCTest runner left in the build directory. Its application selection was corrected and fixture-tested to exclude test runners and refuse ambiguous app products; the subsequent installs selected `dev.alex.porch` correctly.
 
-`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 3 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
+`bash tools/build-uat.sh` successfully produced the unsigned device Release archive at `.build-uat/Porch.xcarchive`. The application reports version 0.2 / build 4 and is an arm64 device executable. The compiled Release binary excludes the appearance-reset and appearance-fixture flags, the DM fixture flag and the fixture transport symbol. Distribution and signing of this archive belong to the operator's own installation workflow.
 
 ## Remaining acceptance
 
