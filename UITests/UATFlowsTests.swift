@@ -13,7 +13,7 @@ final class UATFlowsTests: XCTestCase {
         let draft = app.textFields["message-draft"].exists ? app.textFields["message-draft"] : app.textViews["message-draft"]
         XCTAssertTrue(draft.waitForExistence(timeout:5))
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
-        draft.tap(); draft.typeText("Hello from the fictional UAT test")
+        enterDraft("Hello from the fictional UAT test",in:draft,app:app)
         XCTAssertTrue(app.buttons["send-message"].isEnabled)
         app.buttons["send-message"].tap()
         XCTAssertTrue(app.staticTexts["message-sent"].waitForExistence(timeout:5))
@@ -27,7 +27,8 @@ final class UATFlowsTests: XCTestCase {
         let row = app.buttons.containing(.staticText,identifier:"UAT fixture").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout:5)); row.tap()
         let draft = app.textFields["message-draft"].exists ? app.textFields["message-draft"] : app.textViews["message-draft"]
-        XCTAssertTrue(draft.waitForExistence(timeout:5)); draft.tap(); draft.typeText("Only one copy")
+        XCTAssertTrue(draft.waitForExistence(timeout:5))
+        enterDraft("Only one copy",in:draft,app:app)
         app.buttons["send-message"].tap()
         XCTAssertTrue(app.buttons["Check conversation"].waitForExistence(timeout:5))
         XCTAssertFalse(app.buttons["send-message"].isEnabled)
@@ -47,7 +48,8 @@ final class UATFlowsTests: XCTestCase {
         let row = app.buttons.containing(.staticText,identifier:"UAT fixture").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout:5)); row.tap()
         let draft = app.textFields["message-draft"].exists ? app.textFields["message-draft"] : app.textViews["message-draft"]
-        XCTAssertTrue(draft.waitForExistence(timeout:5)); draft.tap(); draft.typeText("Keep this draft")
+        XCTAssertTrue(draft.waitForExistence(timeout:5))
+        enterDraft("Keep this draft",in:draft,app:app)
         app.buttons["send-message"].tap()
         XCTAssertTrue(app.staticTexts["Instagram restricted this action. Open Instagram to review it."].waitForExistence(timeout:5))
         XCTAssertEqual(draft.value as? String,"Keep this draft")
@@ -62,7 +64,8 @@ final class UATFlowsTests: XCTestCase {
         let row = app.buttons.containing(.staticText,identifier:"UAT fixture").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout:5)); row.tap()
         let draft = app.textFields["message-draft"].exists ? app.textFields["message-draft"] : app.textViews["message-draft"]
-        XCTAssertTrue(draft.waitForExistence(timeout:5)); draft.tap(); draft.typeText("PRIVATE UAT CANARY")
+        XCTAssertTrue(draft.waitForExistence(timeout:5))
+        enterDraft("PRIVATE UAT CANARY",in:draft,app:app)
         app.buttons["send-message"].tap()
         XCTAssertTrue(app.staticTexts["Instagram restricted this action. Open Instagram to review it."].waitForExistence(timeout:5))
         app.terminate(); app.launch()
@@ -76,6 +79,14 @@ final class UATFlowsTests: XCTestCase {
         app.buttons["diagnostics-share"].tap()
         XCTAssertTrue(app.collectionViews["activityCollectionView"].waitForExistence(timeout:10), "The generated file must open in the system share sheet")
         XCTAssertEqual(app.otherElements["LP.CaptionBar.TopCaption"].label, "Porch-diagnostics")
+    }
+    @MainActor private func enterDraft(_ text:String,in draft:XCUIElement,app:XCUIApplication) {
+        draft.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:10),"The composer keyboard must be ready before typing")
+        // Keyboard presentation moves this bottom-anchored field; focus its settled position.
+        draft.tap()
+        draft.typeText(text)
+        XCTAssertEqual(draft.value as? String,text,"The fixture draft must be entered before sending")
     }
     @MainActor private func fixture(extra:[String] = []) -> XCUIApplication {
         continueAfterFailure = false

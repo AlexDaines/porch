@@ -28,6 +28,6 @@ jobs:
           print('PORCH_SIMULATOR=' + phones[0]['udid'])
           PY
       - name: Offline regression and UI journeys
-        run: xcodebuild -project Porch.xcodeproj -scheme Porch -destination "platform=iOS Simulator,id=$PORCH_SIMULATOR" -resultBundlePath test-results/offline.xcresult CODE_SIGNING_ALLOWED=NO test
+        run: xcodebuild -project Porch.xcodeproj -scheme Porch -destination "platform=iOS Simulator,id=$PORCH_SIMULATOR" -resultBundlePath test-results/offline.xcresult -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test
       - name: Build Release for devices
         run: xcodebuild -project Porch.xcodeproj -scheme Porch -configuration Release -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
