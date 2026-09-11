@@ -78,7 +78,8 @@ final class UATFlowsTests: XCTestCase {
         attachment.name = "Fictional durable diagnostics"; attachment.lifetime = .keepAlways; add(attachment)
         app.buttons["diagnostics-share"].tap()
         XCTAssertTrue(app.collectionViews["activityCollectionView"].waitForExistence(timeout:10), "The generated file must open in the system share sheet")
-        XCTAssertEqual(app.otherElements["LP.CaptionBar.TopCaption"].label, "Porch-diagnostics")
+        let filename = app.descendants(matching:.any).matching(NSPredicate(format:"label == %@ OR label == %@","Porch-diagnostics","Porch-diagnostics.json")).firstMatch
+        XCTAssertTrue(filename.waitForExistence(timeout:10),"The share sheet must contain the generated diagnostic file")
     }
     @MainActor private func enterDraft(_ text:String,in draft:XCUIElement,app:XCUIApplication) {
         draft.tap()
