@@ -56,6 +56,27 @@ final class UATFlowsTests: XCTestCase {
         let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
         attachment.name = "Fictional blocked DM preserves draft"; attachment.lifetime = .keepAlways; add(attachment)
     }
+    @MainActor func testDiagnosticsKeepsFailureAfterRestartAndOpensFileShare() {
+        let app = fixture(extra:["--uat-blocked"])
+        app.buttons["tab-Messages"].tap()
+        let row = app.buttons.containing(.staticText,identifier:"UAT fixture").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout:5)); row.tap()
+        let draft = app.textFields["message-draft"].exists ? app.textFields["message-draft"] : app.textViews["message-draft"]
+        XCTAssertTrue(draft.waitForExistence(timeout:5)); draft.tap(); draft.typeText("PRIVATE UAT CANARY")
+        app.buttons["send-message"].tap()
+        XCTAssertTrue(app.staticTexts["Instagram restricted this action. Open Instagram to review it."].waitForExistence(timeout:5))
+        app.terminate(); app.launch()
+        app.buttons["settings"].tap()
+        app.buttons["settings-diagnostics"].tap()
+        XCTAssertTrue(app.staticTexts["diagnostics-last-failure"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["diagnostics-last-failure"].label.contains("actionBlocked"))
+        XCTAssertTrue(app.staticTexts["diagnostics-count"].exists)
+        let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
+        attachment.name = "Fictional durable diagnostics"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["diagnostics-share"].tap()
+        XCTAssertTrue(app.collectionViews["activityCollectionView"].waitForExistence(timeout:10), "The generated file must open in the system share sheet")
+        XCTAssertEqual(app.otherElements["LP.CaptionBar.TopCaption"].label, "Porch-diagnostics")
+    }
     @MainActor private func fixture(extra:[String] = []) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication(); app.terminate()

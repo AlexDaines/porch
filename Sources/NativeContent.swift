@@ -141,8 +141,13 @@ struct NativePostImage: View {
             case .success(let image):
                 image.resizable().scaledToFit().accessibilityLabel(media.alt?.isEmpty == false ? media.alt! : "Post photo")
                     .accessibilityIdentifier("native-post-image").accessibilityAddTraits(.isImage)
-            case .failure:
+            case .failure(let error):
                 Button { retry = UUID() } label: { Label("Reload photo",systemImage:"arrow.clockwise").font(PorchTheme.utility).frame(maxWidth:.infinity,minHeight:180) }
+                    .onAppear {
+                        var fields = DiagnosticsLog.errorFields(error)
+                        if let url = media.imageURL { fields["media_ref"] = DiagnosticsLog.shared.reference(url.absoluteString) }
+                        DiagnosticsLog.shared.record(.imageFailed, fields)
+                    }
             default: ProgressView().frame(maxWidth: .infinity, minHeight: 180)
             }
         }.id(retry).frame(maxWidth: .infinity, maxHeight: maxHeight)

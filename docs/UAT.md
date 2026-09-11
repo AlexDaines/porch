@@ -21,7 +21,7 @@ On first launch, choose a color or continue with Sage. Reopen Porch and confirm 
 
 ## Reporting a problem
 
-Include the app/build version, iPhone model, what you did, expected result and actual result. Settings → Share diagnostic details supplies a report with version and request status only. Avoid putting private screenshots, usernames, messages, cookies or raw responses in public GitHub issues. The diagnostic report does not include those fields.
+Include the app/build version, iPhone model, what you did, expected result and actual result. Settings → Diagnostics → Share log exports the local timeline, including app/build, request status, timing, sign-in transitions and send receipts or failures. Export promptly after a problem; logs survive an app restart and are kept for up to 14 days within a 20 MiB trace budget. The screen shows the last failure and any logging storage problems. Clear log deletes the stored timeline and export. Avoid putting private screenshots, usernames, messages, cookies or raw responses in public GitHub issues. The diagnostic report excludes those fields. Sharing is manual; Porch never uploads diagnostics itself. Logs from build 9 cannot reconstruct attempts made in older builds.
 
 ## Current boundaries
 

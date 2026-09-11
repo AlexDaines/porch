@@ -23,7 +23,7 @@ struct InstagramDataResult: Decodable {
 
 // The journal contains identifiers only, never message bodies or credentials. It survives
 // an app exit between request dispatch and acknowledgement, when resending could duplicate a DM.
-struct SendAttempt: Codable, Equatable { let context: String; let started: Date }
+struct SendAttempt: Codable, Equatable { let context: String; let started: Date; var traceID: String? = nil }
 
 @MainActor
 final class InstagramDataClient: ObservableObject {
@@ -48,6 +48,7 @@ final class InstagramDataClient: ObservableObject {
     private let transport: any InstagramTransport
     private let defaults: UserDefaults
     private let now: () -> Date
+    private let diagnostics: DiagnosticsLog
     private var generation = 0
     private var retryAfter = Date.distantPast
     private var loadedTabs: Set<PorchModel.Tab> = []
@@ -57,11 +58,15 @@ final class InstagramDataClient: ObservableObject {
     var loading: Bool { loadingTabs.contains(activeTab) }
     var hasLoadedCurrentTab: Bool { loadedTabs.contains(activeTab) }
 
-    init(transport: (any InstagramTransport)? = nil, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init) {
-        self.transport = transport ?? WebKitInstagramTransport()
+    init(transport: (any InstagramTransport)? = nil, defaults: UserDefaults = .standard, now: @escaping () -> Date = Date.init, diagnostics: DiagnosticsLog = .shared) {
+        self.diagnostics = diagnostics
+        self.transport = transport ?? WebKitInstagramTransport(diagnostics: diagnostics)
         self.defaults = defaults
         self.now = now
         if let data = defaults.data(forKey: journalKey), let saved = try? JSONDecoder().decode([String:SendAttempt].self, from: data) { pendingSends = saved }
+        for (thread, attempt) in pendingSends {
+            diagnostics.record(.sendRestored, sendFields(thread, attempt).merging(["reason":"journal_restored"]) { _, b in b })
+        }
     }
     func request(_ operation: String, identifier: String = "") async throws -> InstagramDataResult {
         guard ["feed","moreFeed","stories","story","inbox","moreInbox","thread","olderMessages"].contains(operation) else { throw ClientError.unavailable }
@@ -93,12 +98,18 @@ final class InstagramDataClient: ObservableObject {
         if operation == "inbox", result.error == nil { acceptedThreads = Set(result.threads.map(\.id)) }
         if operation == "moreInbox", result.error == nil { acceptedThreads.formUnion(result.threads.map(\.id)) }
         if (operation == "thread" || operation == "olderMessages"), result.error == nil, let attempt = pendingSends[identifier],
-           result.messages.contains(where: { $0.mine && $0.context == attempt.context }) { resolveSend(identifier); drafts[identifier] = nil }
+           result.messages.contains(where: { $0.mine && $0.context == attempt.context }) {
+            diagnostics.record(.sendReconciled, sendFields(identifier, attempt))
+            resolveSend(identifier, reason:"matching_context"); drafts[identifier] = nil
+        }
         return result
     }
     func load(_ tab: PorchModel.Tab, refresh: Bool = false) async {
         activeTab = tab
-        guard (refresh || !loadedTabs.contains(tab)), !loadingTabs.contains(tab) else { return }
+        diagnostics.record(.tabLoad, ["view":tab.rawValue,"refresh":String(refresh),"generation":String(generation)])
+        guard (refresh || !loadedTabs.contains(tab)), !loadingTabs.contains(tab) else {
+            diagnostics.record(.tabCached,["view":tab.rawValue]); return
+        }
         loadingTabs.insert(tab); tabErrors[tab] = nil
         let epoch = generation
         defer { if epoch == generation { loadingTabs.remove(tab) } }
@@ -146,32 +157,62 @@ final class InstagramDataClient: ObservableObject {
         } catch { if epoch == generation { inboxMoreError = Self.code(error) } }
     }
     func sendText(_ text: String, to thread: String) async -> String? {
-        guard acceptedThreads.contains(thread), text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
-              text.utf16.count <= 1000 else { return "invalidMessage" }
-        guard pendingSends[thread] == nil, !sendingThreads.contains(thread) else { return "sendUnconfirmed" }
-        guard now() >= retryAfter else { return "rateLimited" }
-        let attempt = SendAttempt(context: String(UInt64.random(in: 1_000_000_000_000_000_000...9_000_000_000_000_000_000)), started: now())
+        var fields = sendFields(thread, pendingSends[thread]); fields["message_utf16"] = String(text.utf16.count)
+        let invalid = !acceptedThreads.contains(thread) ? "invalid_recipient" : text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ? "empty_message" : text.utf16.count > 1000 ? "message_too_long" : nil
+        if let invalid { fields["reason"] = invalid; diagnostics.record(.sendBlocked,fields); return "invalidMessage" }
+        guard pendingSends[thread] == nil, !sendingThreads.contains(thread) else {
+            fields["reason"] = sendingThreads.contains(thread) ? "in_flight" : "pending_send"
+            diagnostics.record(.sendBlocked,fields); return "sendUnconfirmed"
+        }
+        guard now() >= retryAfter else { fields["reason"] = "cooldown"; diagnostics.record(.sendBlocked,fields); return "rateLimited" }
+        let attempt = SendAttempt(context: String(UInt64.random(in: 1_000_000_000_000_000_000...9_000_000_000_000_000_000)), started: now(), traceID: UUID().uuidString)
         pendingSends[thread] = attempt; saveJournal()
         sendingThreads.insert(thread)
+        fields = sendFields(thread, attempt); fields["message_utf16"] = String(text.utf16.count)
+        diagnostics.record(.sendPrepared,fields)
         let epoch = generation
         defer { if epoch == generation { sendingThreads.remove(thread) } }
         do {
+            await diagnostics.flush()
+            guard epoch == generation else { fields["reason"] = "generation_changed"; diagnostics.record(.sendUnconfirmed,fields); return "sendUnconfirmed" }
+            diagnostics.record(.sendDispatched,fields)
             let result = try await execute("sendText", identifier: thread, text: text, context: attempt.context)
-            guard epoch == generation else { return "sendUnconfirmed" }
+            guard epoch == generation else { fields["reason"] = "generation_changed"; diagnostics.record(.sendUnconfirmed,fields); return "sendUnconfirmed" }
+            fields.merge(result.diagnostic) { _, b in b }
             if result.error == nil, let id = result.sentItemID, !id.isEmpty {
-                resolveSend(thread); drafts[thread] = nil
+                diagnostics.record(.sendReceipt,fields)
+                resolveSend(thread, reason:"server_receipt"); drafts[thread] = nil
                 return nil
             }
             let failure = Self.knownError(result.error) ?? "sendUnconfirmed"
-            if ["signIn","rateLimited","actionBlocked","invalidMessage","sendRejected"].contains(failure) { resolveSend(thread) }
+            fields["result"] = failure
+            if ["signIn","rateLimited","actionBlocked","invalidMessage","sendRejected"].contains(failure) {
+                diagnostics.record(.sendRefused,fields); resolveSend(thread, reason:"explicit_refusal")
+            } else { diagnostics.record(.sendUnconfirmed,fields) }
             return failure
-        } catch { return "sendUnconfirmed" }
+        } catch {
+            fields.merge(DiagnosticsLog.errorFields(error)) { _, b in b }
+            fields["result"] = "sendUnconfirmed"
+            diagnostics.record(.sendUnconfirmed,fields); return "sendUnconfirmed"
+        }
+    }
+    private func sendFields(_ thread: String, _ attempt: SendAttempt?) -> [String:String] {
+        var fields = ["operation":"sendText","thread_ref":diagnostics.reference("identifier:"+thread),"pending_count":String(pendingSends.count),"generation":String(generation)]
+        if let attempt {
+            fields["context_ref"] = diagnostics.reference("context:"+attempt.context)
+            if let trace = attempt.traceID { fields["attempt_id"] = trace }
+        }
+        return fields
     }
     func keepDraft(_ text: String, for thread: String) { drafts[thread] = text.isEmpty ? nil : String(text.prefix(4000)) }
-    func resolveSend(_ thread: String) { pendingSends[thread] = nil; saveJournal() }
+    func resolveSend(_ thread: String, reason: String = "user_checked") {
+        diagnostics.record(.sendWarningCleared,sendFields(thread,pendingSends[thread]).merging(["reason":reason]) { _, b in b })
+        pendingSends[thread] = nil; saveJournal()
+    }
     private func saveJournal() { defaults.set(try? JSONEncoder().encode(pendingSends), forKey: journalKey) }
     func clearJournal() { pendingSends = [:]; lastSendDiagnostic = nil; defaults.removeObject(forKey: journalKey) }
     func close() {
+        diagnostics.record(.sessionClosed,["pending_count":String(pendingSends.count),"generation":String(generation)])
         generation += 1; transport.close()
         posts = []; stories = []; threads = []; drafts = [:]; hasMore = false; moreLoading = false; moreError = nil
         inboxHasMore = false; inboxLoadingMore = false; inboxMoreError = nil

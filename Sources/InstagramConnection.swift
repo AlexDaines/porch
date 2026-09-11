@@ -23,15 +23,18 @@ final class InstagramConnection: ObservableObject {
     private var task: Task<Void, Never>?
     private var generation = 0
     private var automaticChecksPaused = false
+    private let diagnostics: DiagnosticsLog
 
-    init(browser: any InstagramAuthentication, transport: (any InstagramTransport)? = nil) {
+    init(browser: any InstagramAuthentication, transport: (any InstagramTransport)? = nil, diagnostics: DiagnosticsLog = .shared) {
+        self.diagnostics = diagnostics
         self.browser = browser
-        self.transport = transport ?? WebKitInstagramTransport()
+        self.transport = transport ?? WebKitInstagramTransport(diagnostics: diagnostics)
         browser.onPossibleSignIn = { [weak self] in self?.checkSignIn(automatic: true) }
     }
     func refreshSavedSession() async {
         let epoch = generation
         let saved = await browser.hasSavedSession()
+        diagnostics.record(.authHint,["saved_session":String(saved),"generation":String(epoch)])
         if epoch == generation { hasSavedSession = saved }
     }
     func start() {
@@ -41,12 +44,15 @@ final class InstagramConnection: ObservableObject {
     func signIn() {
         cancel()
         phase = .signingIn
+        diagnostics.record(.authStart,["phase":"signingIn","generation":String(generation)])
         browser.connect()
     }
     func checkSignIn(automatic: Bool = false) {
-        guard phase == .signingIn, !checking else { return }
+        guard phase == .signingIn, !checking else {
+            diagnostics.record(.authSuppressed,["reason":checking ? "already_checking" : "wrong_phase"]); return
+        }
         // Failed automatic checks stop. Cookie churn must not create a retry loop.
-        guard !automatic || !automaticChecksPaused else { return }
+        guard !automatic || !automaticChecksPaused else { diagnostics.record(.authSuppressed,["reason":"automatic_paused"]); return }
         verify(automatic: automatic)
     }
     private func verify(automatic: Bool = false) {
@@ -55,11 +61,13 @@ final class InstagramConnection: ObservableObject {
         failure = nil
         if !automatic { automaticChecksPaused = false }
         let epoch = generation
+        diagnostics.record(.authVerify,["automatic":String(automatic),"generation":String(epoch)])
         task = Task { @MainActor in
             let saved = await browser.hasSavedSession()
             guard epoch == generation else { return }
             hasSavedSession = saved
             if !saved {
+                diagnostics.record(.authResult,["reason":"no_saved_session","saved_session":"false","generation":String(epoch)])
                 checking = false
                 task = nil
                 if phase == .idle { signIn() }
@@ -72,6 +80,7 @@ final class InstagramConnection: ObservableObject {
                 code = result.error
             } catch { code = InstagramDataClient.code(error) }
             guard epoch == generation else { return }
+            diagnostics.record(.authResult,["result":code ?? "none","generation":String(epoch)])
             checking = false
             task = nil
             if let code {
@@ -89,6 +98,7 @@ final class InstagramConnection: ObservableObject {
         }
     }
     func cancel() {
+        diagnostics.record(.authCancel,["generation":String(generation)])
         generation += 1
         task?.cancel(); task = nil
         transport.close(); browser.suspend()

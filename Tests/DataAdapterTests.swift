@@ -236,6 +236,31 @@ final class DataAdapterTests: XCTestCase {
         XCTAssertEqual(count, 12, "Each explicit operation dispatches once, with no hidden send retries")
     }
 
+    func testProgressiveFailureTraceIncludesHTTPAndFingerprintButNoContent() async throws {
+        let harness = AdapterHarness(); try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'csrftoken=PRIVATE_CSRF; path=/';
+        globalThis.pages = [{inbox:{threads:[{thread_id:'21'}]}},{thread:{items:[]}},
+          {__http:400,status:'fail',message:'PRIVATE_ERROR',error_type:'PRIVATE_TYPE'},
+          {__http:400,status:'fail',message:'PRIVATE_ERROR',error_type:'PRIVATE_TYPE'}];
+        """#)
+        _ = try await harness.request("inbox")
+        _ = try await harness.request("thread", identifier: "21")
+        let first = try await harness.request("sendText", identifier: "21", message: "PRIVATE_DRAFT")
+        let second = try await harness.request("sendText", identifier: "21", message: "PRIVATE_DRAFT", context: "2234567890123456789")
+        XCTAssertEqual(first.error, "sendRejected")
+        XCTAssertEqual(first.diagnostic["server_fingerprint"]?.count, 64)
+        XCTAssertEqual(first.diagnostic["server_fingerprint"], second.diagnostic["server_fingerprint"])
+        let send = harness.traces.filter { $0["operation"] == "sendText" }
+        XCTAssertTrue(send.contains { $0["stage"] == "http_received" && $0["http"] == "400" })
+        XCTAssertTrue(send.contains { $0["stage"] == "decoded" && $0["response_shape"]?.contains("message=string") == true })
+        XCTAssertFalse(harness.traces.description.contains("PRIVATE"))
+        let count = try await harness.script("return calls.length;") as? Int
+        XCTAssertEqual(count, 4)
+        let keySent = try await harness.script("return JSON.stringify(calls).includes('a'.repeat(64));") as? Bool
+        XCTAssertEqual(keySent, false)
+    }
+
     func testNativeMediaRejectsForeignAndCredentialBearingURLs() {
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://s.cdninstagram.com/image.jpg"))
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://v.fbcdn.net/video.mp4"))
@@ -249,12 +274,15 @@ final class DataAdapterTests: XCTestCase {
 private final class AdapterHarness: NSObject, WKNavigationDelegate {
     private let webView: WKWebView
     private var ready: CheckedContinuation<Void, Error>?
+    private(set) var traces: [[String: String]] = []
     override init() {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         config.defaultWebpagePreferences.allowsContentJavaScript = false
         webView = WKWebView(frame:.zero,configuration:config)
         super.init()
+        let sink = AdapterTraceSink(); sink.owner = self
+        config.userContentController.add(sink, contentWorld: .defaultClient, name: "porchDiagnostics")
         webView.navigationDelegate = self
     }
     func prepare() async throws {
@@ -277,10 +305,17 @@ private final class AdapterHarness: NSObject, WKNavigationDelegate {
     func request(_ operation:String,identifier:String = "",message:String = "",context:String = "1234567890123456789") async throws -> InstagramDataResult {
         let path = try XCTUnwrap(Bundle.main.url(forResource:"instagram-data",withExtension:"js"))
         let source = try String(contentsOf:path,encoding:.utf8)
-        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier,"messageText":message,"clientContext":context],in:nil,contentWorld:.defaultClient)
+        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier,"messageText":message,"clientContext":context,"requestTraceID":UUID().uuidString,"diagnosticKey":String(repeating:"a",count:64)],in:nil,contentWorld:.defaultClient)
         let text = try XCTUnwrap(output as? String)
         return try JSONDecoder().decode(InstagramDataResult.self,from:Data(text.utf8))
     }
     func webView(_ webView:WKWebView,didFinish navigation:WKNavigation!) { ready?.resume(); ready = nil }
     func webView(_ webView:WKWebView,didFailProvisionalNavigation navigation:WKNavigation!,withError error:Error) { ready?.resume(throwing:error); ready = nil }
+    func receive(_ message: WKScriptMessage) {
+        if let body = message.body as? [String: Any], let fields = body["fields"] as? [String: String] { traces.append(fields) }
+    }
+}
+@MainActor private final class AdapterTraceSink: NSObject, WKScriptMessageHandler {
+    weak var owner: AdapterHarness?
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) { owner?.receive(message) }
 }

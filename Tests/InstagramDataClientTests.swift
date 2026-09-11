@@ -6,6 +6,42 @@ final class InstagramDataClientTests: XCTestCase {
     private func defaults() -> UserDefaults { UserDefaults(suiteName:"porch.tests."+UUID().uuidString)! }
     private func post(_ id: String) -> InstagramPost { InstagramPost(id:id,username:"fixture",caption:"Fixture",timestamp:1,media:[]) }
 
+    func testSendTraceSurvivesRestartAndReconciliationWithoutContentOrRetry() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = defaults(), log = DiagnosticsLog(directory: directory), transport = StubTransport()
+        transport.results = [.init(threads:[.init(id:"21",title:"PRIVATE_NAME",preview:"")]), .init(error:"sendUnconfirmed")]
+        let client = InstagramDataClient(transport:transport,defaults:store,diagnostics:log)
+        await client.load(.messages)
+        _ = await client.sendText("PRIVATE_DRAFT",to:"21")
+        let attempt = try XCTUnwrap(client.pendingSends["21"])
+        let nextTransport = StubTransport()
+        nextTransport.results = [.init(messages:[.init(id:"PRIVATE_ITEM",text:"PRIVATE_DRAFT",mine:true,context:attempt.context)])]
+        let nextLog = DiagnosticsLog(directory:directory)
+        let next = InstagramDataClient(transport:nextTransport,defaults:store,diagnostics:nextLog)
+        _ = try await next.request("thread",identifier:"21")
+        XCTAssertNil(next.pendingSends["21"])
+        XCTAssertEqual(transport.calls.filter { $0 == "sendText" }.count,1)
+        XCTAssertEqual(nextTransport.calls,["thread"])
+        await nextLog.flush()
+        let snapshot = await log.snapshot()
+        let events = snapshot.entries.filter { $0.event.rawValue.hasPrefix("send") }
+        for event in [DiagnosticsLog.Event.sendPrepared,.sendDispatched,.sendUnconfirmed,.sendRestored,.sendReconciled,.sendWarningCleared] {
+            XCTAssertTrue(events.contains { $0.event == event }, "Missing \(event)")
+        }
+        XCTAssertTrue(events.allSatisfy { $0.fields["attempt_id"] == attempt.traceID })
+        XCTAssertFalse(events.description.contains("PRIVATE"))
+        XCTAssertFalse(events.description.contains(attempt.context))
+    }
+
+    func testLegacySendJournalStillRestoresWithoutTraceID() throws {
+        let store = defaults()
+        store.set(Data(#"{"21":{"context":"1234567890123456789","started":0}}"#.utf8),forKey:"porch.pending-sends.v1")
+        let client = InstagramDataClient(transport:StubTransport(),defaults:store)
+        XCTAssertEqual(client.pendingSends["21"]?.context,"1234567890123456789")
+        XCTAssertNil(client.pendingSends["21"]?.traceID)
+    }
+
     func testRefreshAndPaginationFailuresKeepContentAndCursorAvailable() async {
         let transport = StubTransport()
         transport.results = [.init(posts:[post("1")],hasMore:true), .init(error:"offline"), .init(error:"rateLimited")]

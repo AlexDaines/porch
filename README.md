@@ -54,7 +54,7 @@ The default suite uses fictional fixtures. Adapter tests use a nonpersistent Web
 
 Run `bash tools/build-uat.sh` to produce an unsigned **Release** archive at `.build-uat/Porch.xcarchive`. Signing and installation use the operator's existing distribution workflow. Debug fixture transport is excluded from Release. No TestFlight or App Store submission is made by this script.
 
-The [UAT guide](docs/UAT.md) describes the checks and remaining acceptance gates. Settings → Share diagnostic details includes version and request status without account content. CI runs only offline fixtures and a device Release compilation; live account checks are opt-in.
+The [UAT guide](docs/UAT.md) describes the checks and remaining acceptance gates. Settings → Diagnostics → Share log exports a durable, bounded local timeline without credentials or conversation content. See the [diagnostics contract](docs/DIAGNOSTICS.md) for coverage, privacy and retention. CI runs only offline fixtures and a device Release compilation; live account checks are opt-in.
 
 ## Project commitment
 

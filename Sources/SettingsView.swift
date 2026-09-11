@@ -11,12 +11,7 @@ struct SettingsView: View {
     @State private var clearing = false
     @State private var showColors = false
     @State private var showAbout = false
-    private var diagnosticReport: String {
-        let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "?"
-        let build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "?"
-        let send = client.lastSendDiagnostic.map { "\n\nLast send\n\($0)" } ?? ""
-        return "Porch \(version) (\(build))\niOS \(UIDevice.current.systemVersion)\n\(client.diagnostic)\(send)"
-    }
+    @State private var showDiagnostics = false
     var body: some View {
         VStack(spacing: 0) {
             PorchSheetHeader(title: "Settings", closeLabel: "Done", closeDisabled: clearing, identifier: "settings-title") { dismiss() }
@@ -45,8 +40,7 @@ struct SettingsView: View {
                         }.font(PorchTheme.detail).foregroundStyle(PorchTheme.muted).padding(.top,12)
                     }
                     Link("Source code",destination:URL(string:"https://github.com/AlexDaines/porch")!).frame(minHeight:44)
-                    ShareLink(item: diagnosticReport) { Text("Share diagnostic details") }.frame(minHeight:44)
-                    Text("Includes app version and request status. No usernames, messages, cookies or media.").font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                    Button { showDiagnostics = true } label: { Text("Diagnostics").frame(minWidth:44,minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("settings-diagnostics")
                     PorchRule()
                     Button("End session") { client.close(); browser.suspend(); model.mode = .welcome; dismiss() }
                         .frame(minHeight:44).accessibilityLabel("Finish session")
@@ -65,5 +59,6 @@ struct SettingsView: View {
             }
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
             .porchSheet().interactiveDismissDisabled(clearing).tint(accent)
+            .sheet(isPresented: $showDiagnostics) { DiagnosticsView() }
     }
 }

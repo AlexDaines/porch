@@ -12,7 +12,15 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
     var onPossibleSignIn: (() -> Void)?
     private var urlObservation: NSKeyValueObservation?
     private var timeout: Task<Void, Never>?
-    private let sessionProbe = WebKitInstagramTransport()
+    private let sessionProbe: WebKitInstagramTransport
+    private let diagnostics: DiagnosticsLog
+    private var pageStarted = Date()
+
+    init(diagnostics: DiagnosticsLog = .shared) {
+        self.diagnostics = diagnostics
+        sessionProbe = WebKitInstagramTransport(diagnostics: diagnostics)
+        super.init()
+    }
 
     func hasSavedSession() async -> Bool {
         // A fresh process can report an empty WK cookie store until an app-bound
@@ -51,13 +59,15 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
     func clearWebsiteData() async {
         guard !clearingWebsiteData else { return }
         clearingWebsiteData = true
+        diagnostics.record(.authClear, ["stage": "preparing"])
         defer { clearingWebsiteData = false }
         suspend()
         await WKWebsiteDataStore.default().removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), modifiedSince: .distantPast)
         URLCache.shared.removeAllCachedResponses()
+        diagnostics.record(.authClear, ["stage": "completed"])
     }
     func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
-        if webView != nil { onPossibleSignIn?() }
+        if webView != nil { diagnostics.record(.authCookiesChanged); onPossibleSignIn?() }
     }
     private func considerSignIn(_ view: WKWebView) {
         guard view === webView, let url = view.url, NavigationPolicy.classify(url) == .allow else { return }
@@ -68,16 +78,22 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
     private func beginLoading(_ view: WKWebView) {
         timeout?.cancel()
         loading = true
+        pageStarted = Date()
+        diagnostics.record(.authPageStarted)
         timeout = Task { @MainActor [weak self, weak view] in
             do { try await Task.sleep(for: .seconds(30)) } catch { return }
             guard let self, let view, view === self.webView else { return }
             view.stopLoading()
             self.loading = false
             self.failure = "Instagram took too long to open."
+            self.diagnostics.record(.authPageFailed, ["reason": "timeout", "duration_ms": String(Date().timeIntervalSince(self.pageStarted) * 1_000)])
         }
     }
     func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard action.targetFrame?.isMainFrame != false else { decisionHandler(.allow); return }
+        let allowed = action.request.url.map { NavigationPolicy.classify($0) == .allow } ?? false
+        diagnostics.record(.authNavigation, ["navigation": Self.navigationClass(action.request.url),
+            "decision": allowed ? (action.targetFrame == nil ? "new_window" : "allow") : "cancel"])
         guard let url = action.request.url, NavigationPolicy.classify(url) == .allow else {
             notice = "Use your Instagram username and password here. External sign-in options aren't supported yet."
             decisionHandler(.cancel); return
@@ -92,17 +108,42 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         guard webView === self.webView else { return }
         timeout?.cancel(); timeout = nil; loading = false
+        diagnostics.record(.authPageFinished, ["navigation": Self.navigationClass(webView.url),
+            "duration_ms": String(Date().timeIntervalSince(pageStarted) * 1_000)])
         considerSignIn(webView)
+    }
+    func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if response.isForMainFrame, let http = response.response as? HTTPURLResponse {
+            diagnostics.record(.authNavigation, ["http": String(http.statusCode), "navigation": Self.navigationClass(http.url)])
+        }
+        decisionHandler(.allow)
     }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { if webView === self.webView { fail(error) } }
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { if webView === self.webView { fail(error) } }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        if webView === self.webView { fail(URLError(.cannotLoadFromNetwork)) }
+        if webView === self.webView {
+            diagnostics.record(.authPageFailed, ["reason": "process_terminated"])
+            fail(URLError(.cannotLoadFromNetwork))
+        }
     }
     private func fail(_ error: Error) {
+        diagnostics.record(.authPageFailed, DiagnosticsLog.errorFields(error).merging(
+            ["duration_ms": String(Date().timeIntervalSince(pageStarted) * 1_000)], uniquingKeysWith: { _, new in new }))
         guard (error as NSError).code != NSURLErrorCancelled else { return }
         timeout?.cancel(); timeout = nil; loading = false
         failure = "Couldn't open Instagram. Check your connection and try again."
+    }
+    static func navigationClass(_ url: URL?) -> String {
+        guard let url else { return "invalid" }
+        guard url.host == "www.instagram.com" || url.host == "instagram.com" else { return "external" }
+        let path = url.path.lowercased()
+        if path.hasPrefix("/accounts/login") { return "login" }
+        if path.hasPrefix("/challenge") { return "challenge" }
+        if path.hasPrefix("/checkpoint") { return "checkpoint" }
+        if path.contains("/two_factor") { return "two_factor" }
+        if path.hasPrefix("/accounts/onetap") { return "one_tap" }
+        if path.hasPrefix("/direct/") { return "direct" }
+        return path == "/" ? "home" : "instagram_other"
     }
 }
 struct InstagramWebView: UIViewRepresentable {
