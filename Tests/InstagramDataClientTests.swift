@@ -134,15 +134,15 @@ final class InstagramDataClientTests: XCTestCase {
         XCTAssertNotNil(client.pendingSends["21"])
     }
     func testRateLimitUsesServerDelayAndDoesNotRetryAutomatically() async {
-        let transport = StubTransport(); transport.results = [.init(error:"rateLimited",retryAfterSeconds:300),.init()]
+        let transport = StubTransport(); transport.results = [.init(error:"rateLimited",retryAfterSeconds:172800),.init()]
         var date = Date()
         let client = InstagramDataClient(transport:transport,defaults:defaults(),now:{date})
         await client.load(.feed)
-        date = date.addingTimeInterval(61)
+        date = date.addingTimeInterval(86401)
         await client.load(.stories)
         XCTAssertEqual(transport.calls.count,1)
         XCTAssertEqual(client.error,"rateLimited")
-        date = date.addingTimeInterval(240)
+        date = date.addingTimeInterval(86400)
         await client.load(.stories)
         XCTAssertEqual(transport.calls.count,2)
         XCTAssertNil(client.error)

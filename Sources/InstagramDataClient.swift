@@ -86,10 +86,10 @@ final class InstagramDataClient: ObservableObject {
         }
         guard epoch == generation else { throw CancellationError() }
         if result.error == "signIn" { tabErrors[activeTab] = "signIn" }
-        if result.error == "rateLimited" { retryAfter = now().addingTimeInterval(Double(max(60, min(result.retryAfterSeconds ?? 60, 86400)))) }
+        if result.error == "rateLimited" { retryAfter = now().addingTimeInterval(Double(max(60, result.retryAfterSeconds ?? 60))) }
         let http = result.diagnostic["http"].flatMap(Int.init).map(String.init) ?? "none"
         let code = Self.knownError(result.error) ?? "none"
-        let safeReasons = ["login_required", "challenge_required", "checkpoint_required", "two_factor_required",
+        let safeReasons = ["login_required", "user_has_logged_out", "challenge_required", "checkpoint_required", "two_factor_required",
                            "feedback_required", "sentry_block", "rate_limit_error", "unclassified", "invalid_response",
                            "missing_receipt", "receipt_mismatch"]
         let reason = result.diagnostic["reason"].flatMap { safeReasons.contains($0) ? $0 : nil } ?? "none"

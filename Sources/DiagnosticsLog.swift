@@ -9,7 +9,7 @@ final class DiagnosticsLog: @unchecked Sendable {
         case appLaunch, lifecycle, network, memoryWarning, thermal
         case authStart, authHint, authVerify, authResult, authCancel, authSuppressed
         case authNavigation, authPageStarted, authPageFinished, authPageFailed, authCookiesChanged, authClear
-        case requestQueued, requestStarted, requestCompleted, requestFailed, requestCancelled
+        case requestQueued, requestStarted, requestContext, requestCompleted, requestFailed, requestCancelled
         case webPrepare, webReady, webFailed, webTerminated, transportClosed, adapterStage
         case tabLoad, tabCached, tabResult, pagination, sessionClosed
         case sendBlocked, sendPrepared, sendDispatched, sendReceipt, sendRefused, sendUnconfirmed
@@ -280,10 +280,11 @@ final class DiagnosticsLog: @unchecked Sendable {
     private static let errorDomains: Set<String> = ["NSURLErrorDomain", "WKErrorDomain", "NSCocoaErrorDomain", "AVFoundationErrorDomain", "NSOSStatusErrorDomain", "NSPOSIXErrorDomain", "other"]
     static let operations: Set<String> = ["sessionHint", "session", "feed", "moreFeed", "stories", "story", "inbox", "moreInbox", "thread", "olderMessages", "sendText"]
     static let errors: Set<String> = ["none", "offline", "timedOut", "signIn", "rateLimited", "actionBlocked", "unsupported", "unavailable", "invalidMessage", "sendRejected", "sendUnconfirmed", "cancelled"]
-    private static let numbers: Set<String> = ["http", "duration_ms", "queue_ms", "fetch_ms", "decode_ms", "prepare_ms", "bridge_ms", "response_bytes", "response_chars", "request_bytes", "queue_depth", "generation", "posts", "stories", "threads", "messages", "raw_count", "filtered_count", "message_utf16", "pending_count", "cursor_length", "error_code", "exception_type", "exception_code", "signal", "frame_count", "duration_seconds", "memory_bytes", "schema_unknown_keys", "discarded_field_count", "payload_count", "period_start", "period_end", "js_line", "js_column"]
-    private static let booleans: Set<String> = ["automatic", "saved_session", "has_more", "refresh", "csrf_present", "viewer_present", "context_valid", "thread_allowed", "thread_opened", "receipt_present", "receipt_thread_matches", "receipt_context_matches", "low_power", "expensive", "constrained", "ipv4", "ipv6", "dns", "simulator", "muted", "frames_truncated"]
+    static let maximumFields = 96
+    private static let numbers: Set<String> = ["adapter_revision", "transport_request_index", "since_previous_fetch_ms", "large_integer_count", "retry_after_seconds", "cookie_count", "http", "duration_ms", "queue_ms", "fetch_ms", "decode_ms", "prepare_ms", "bridge_ms", "response_bytes", "response_chars", "request_bytes", "queue_depth", "generation", "posts", "stories", "threads", "messages", "raw_count", "filtered_count", "message_utf16", "pending_count", "cursor_length", "error_code", "exception_type", "exception_code", "signal", "frame_count", "duration_seconds", "memory_bytes", "schema_unknown_keys", "discarded_field_count", "payload_count", "period_start", "period_end", "js_line", "js_column"]
+    private static let booleans: Set<String> = ["secure_context", "ua_mobile", "ua_safari", "account_changed", "challenge_present", "two_factor_present", "feedback_present", "spam_flag", "session_cookie_present", "csrf_cookie_present", "viewer_cookie_present", "device_cookie_present", "machine_cookie_present", "automatic", "saved_session", "has_more", "refresh", "csrf_present", "viewer_present", "context_valid", "thread_allowed", "thread_opened", "receipt_present", "receipt_thread_matches", "receipt_context_matches", "low_power", "expensive", "constrained", "ipv4", "ipv6", "dns", "simulator", "muted", "frames_truncated"]
     private static let enums: [String: Set<String>] = [
-        "operation": operations, "result": errors, "error_domain": errorDomains,
+        "operation": operations, "result": errors, "error_domain": errorDomains, "savedSession": ["present", "absent"],
         "phase": ["idle", "signingIn", "connected"], "mode": ["welcome", "sample", "instagram", "finished"],
         "view": ["Feed", "Stories", "Messages", "Settings", "Diagnostics", "welcome"],
         "state": ["active", "inactive", "background", "foreground", "terminated", "satisfied", "unsatisfied", "requiresConnection", "nominal", "fair", "serious", "critical", "unknown"],
@@ -291,15 +292,23 @@ final class DiagnosticsLog: @unchecked Sendable {
         "method": ["GET", "POST"], "origin": ["instagram_web", "instagram_mobile", "instagram_cdn", "facebook_cdn", "other"],
         "content_type": ["json", "html", "text", "other", "missing"],
         "stage": ["validation", "fetch_started", "http_received", "decoded", "completed", "queued", "preparing", "bridge", "schema", "receipt", "watchdog", "asset", "player"],
-        "reason": ["none", "login_required", "challenge_required", "checkpoint_required", "two_factor_required", "feedback_required", "sentry_block", "rate_limit_error", "unclassified", "invalid_response", "missing_receipt", "receipt_mismatch", "pending_send", "in_flight", "invalid_recipient", "empty_message", "message_too_long", "invalid_context", "missing_csrf", "cooldown", "generation_changed", "no_saved_session", "verification_failed", "user_cancel", "user_checked", "matching_context", "server_receipt", "explicit_refusal", "journal_restored", "rate_limit", "automatic_paused", "already_checking", "wrong_phase", "timeout", "transport_error", "process_terminated", "not_playable", "external_navigation", "blocked_surface", "invalid_navigation"],
+        "reason": ["none", "user_has_logged_out", "login_required", "challenge_required", "checkpoint_required", "two_factor_required", "feedback_required", "sentry_block", "rate_limit_error", "unclassified", "invalid_response", "missing_receipt", "receipt_mismatch", "pending_send", "in_flight", "invalid_recipient", "empty_message", "message_too_long", "invalid_context", "missing_csrf", "cooldown", "generation_changed", "no_saved_session", "verification_failed", "user_cancel", "user_checked", "matching_context", "server_receipt", "explicit_refusal", "journal_restored", "rate_limit", "automatic_paused", "already_checking", "wrong_phase", "timeout", "transport_error", "process_terminated", "not_playable", "external_navigation", "blocked_surface", "invalid_navigation"],
         "navigation": ["login", "challenge", "checkpoint", "two_factor", "one_tap", "direct", "home", "instagram_other", "external", "invalid"],
         "decision": ["allow", "cancel", "new_window"], "source": ["app", "fixture", "metrickit"],
-        "fetch_error": ["TimeoutError", "AbortError", "TypeError", "other", "none"]
+        "fetch_error": ["TimeoutError", "AbortError", "TypeError", "other", "none"],
+        "document_origin": ["instagram_web", "opaque", "other"], "location_origin": ["instagram_web", "opaque", "other"],
+        "document_kind": ["instagram_home", "local", "other"], "referrer_kind": ["empty", "present"],
+        "ua_family": ["ios_webkit", "other_webkit", "other"], "cookie_store": ["persistent", "ephemeral"],
+        "claim_reset": ["new_transport", "account_change", "csrf_change", "none"],
+        "claim_sent": ["bootstrap", "server"], "claim_received": ["absent", "accepted", "rejected"],
+        "response_type": ["basic", "cors", "opaque", "opaqueredirect", "default", "error", "other"],
+        "json_parse": ["ok", "invalid"], "server_status": ["ok", "fail", "missing", "other"],
+        "reason_source": ["none", "message", "error_type", "payload_message", "payload_error_type", "structure"]
     ]
-    private static let shapePaths: Set<String> = ["status", "message", "error_type", "payload", "payload.item_id", "payload.thread_id", "payload.client_context", "payload.message", "challenge", "two_factor_info", "feedback_message", "feedback_title", "inbox", "inbox.threads", "thread", "thread.items", "feed_items", "tray", "reels", "reels_media", "pagination_source", "has_older", "oldest_cursor"]
+    private static let shapePaths: Set<String> = ["payload.error_type", "spam", "error", "error.code", "error.error_subcode", "status", "message", "error_type", "payload", "payload.item_id", "payload.thread_id", "payload.client_context", "payload.message", "challenge", "two_factor_info", "feedback_message", "feedback_title", "inbox", "inbox.threads", "thread", "thread.items", "feed_items", "tray", "reels", "reels_media", "pagination_source", "has_older", "oldest_cursor"]
     static func sanitize(_ input: [String: String]) -> [String: String] {
         var result: [String: String] = [:]
-        for (field, value) in input.prefix(96) {
+        for (field, value) in input.prefix(Self.maximumFields) {
             if field == "exception_code", value.count <= 20, Int64(value) != nil || UInt64(value) != nil {
                 result[field] = value
             } else if numbers.contains(field), value.count <= 20, let number = Double(value), number.isFinite, abs(number) <= 1e15 {

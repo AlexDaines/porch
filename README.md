@@ -29,7 +29,7 @@ This is an **experimental source release**. Native playback progression is verif
 
 Instagram's website is used only for sign-in. For reading, a separate, empty local WebKit document makes authenticated GET requests using the existing on-device cookie store. A small bundled adapter reduces responses to bounded models; SwiftUI renders them. No Instagram application HTML, application scripts, or live DOM-pruning loop is loaded for reading.
 
-Credentials stay in WebKit. Post and message content crosses into native memory; nothing is sent to a Porch server. Instagram and its media servers still see requests. See [PRIVACY.md](PRIVACY.md) and [DESIGN.md](DESIGN.md).
+Credentials stay in WebKit. Post and message content crosses into native memory; nothing is sent to a Porch server. Instagram and its media servers still see requests. See [PRIVACY.md](PRIVACY.md), [DESIGN.md](DESIGN.md) and the [request compatibility audit](docs/REQUESTS.md).
 
 ## Build
 

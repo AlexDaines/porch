@@ -1,12 +1,29 @@
 /* Runs in an empty local WebKit document with the existing Instagram cookie store.
    Only this bundled adapter executes; Instagram's application HTML/JS is not loaded. */
 const cookie = name => document.cookie.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))?.slice(name.length + 1);
-const headers = {'X-IG-App-ID': '936619743392459', 'X-Requested-With': 'XMLHttpRequest', 'X-IG-WWW-Claim': '0'};
 const csrf = cookie('csrftoken');
+const viewer = cookie('ds_user_id') || '';
+const previousState = globalThis.__porchDataState;
+const accountChanged = Boolean(previousState && previousState.viewer !== viewer);
+const state = !previousState || accountChanged ? (globalThis.__porchDataState = {
+  viewer, feedCursor: null, storyIDs: new Set(), threadIDs: new Set(), openedThreads: new Set(),
+  sentContexts: new Map(), inboxCursor: null, threadCursors: new Map(), fetchCount: 0
+}) : previousState;
+const claimReset = !previousState ? 'new_transport' : accountChanged ? 'account_change' : state.csrf !== csrf ? 'csrf_change' : 'none';
+// Claims belong to this browser/account/CSRF context. Never fabricate a token,
+// transfer it between accounts, persist it in native code, or include it in logs.
+if (state.csrf !== csrf) { state.wwwClaim = null; state.csrf = csrf; }
+const headers = {'X-IG-App-ID': '936619743392459', 'X-Requested-With': 'XMLHttpRequest', 'X-IG-WWW-Claim': state.wwwClaim || '0'};
 if (csrf) headers['X-CSRFToken'] = csrf;
-const state = globalThis.__porchDataState ||= {feedCursor: null, storyIDs: new Set(), threadIDs: new Set(), openedThreads: new Set(), sentContexts: new Map(), inboxCursor: null, threadCursors: new Map()};
+const originKind = value => value === 'https://www.instagram.com' ? 'instagram_web' : value === 'null' ? 'opaque' : 'other';
 const result = {posts: [], stories: [], threads: [], messages: [], hasMore: false, error: null,
-  diagnostic: {operation, origin: 'instagram_web', csrf_present: String(Boolean(csrf)), viewer_present: String(Boolean(cookie('ds_user_id')))}, retryAfterSeconds: null, sentItemID: null};
+  diagnostic: {operation, origin: 'instagram_web', adapter_revision: '10', csrf_present: String(Boolean(csrf)), viewer_present: String(Boolean(viewer)),
+    document_origin: originKind(globalThis.origin), location_origin: originKind(location.origin),
+    document_kind: document.URL === 'https://www.instagram.com/' ? 'instagram_home' : document.URL.startsWith('about:') ? 'local' : 'other',
+    secure_context: String(globalThis.isSecureContext === true), referrer_kind: document.referrer ? 'present' : 'empty',
+    ua_family: /AppleWebKit/.test(navigator.userAgent) ? (/iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios_webkit' : 'other_webkit') : 'other',
+    ua_mobile: String(/Mobile\//.test(navigator.userAgent)), ua_safari: String(/Version\/.*Safari\//.test(navigator.userAgent)),
+    claim_sent: state.wwwClaim && state.wwwClaim !== '0' ? 'server' : 'bootstrap', claim_reset: claimReset, account_changed: String(accountChanged)}, retryAfterSeconds: null, sentItemID: null};
 const startedAt = performance.now();
 function trace(stage) {
   // The isolated app content world is the only place this handler exists. Trace
@@ -19,7 +36,7 @@ function trace(stage) {
 }
 function responseShape(data) {
   const paths = ['status','message','error_type','payload','payload.item_id','payload.thread_id','payload.client_context','payload.message',
-    'challenge','two_factor_info','feedback_message','feedback_title','inbox','inbox.threads','thread','thread.items',
+    'payload.error_type','challenge','two_factor_info','feedback_message','feedback_title','spam','error','error.code','error.error_subcode','inbox','inbox.threads','thread','thread.items',
     'feed_items','tray','reels','reels_media','pagination_source','has_older','oldest_cursor'];
   const shape = [];
   for (const path of paths) {
@@ -27,13 +44,13 @@ function responseShape(data) {
     for (const part of path.split('.')) value = value && typeof value === 'object' ? value[part] : undefined;
     if (value !== undefined) shape.push(path + '=' + (value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value));
   }
-  result.diagnostic.response_shape = shape.join(';');
+  if (shape.length) result.diagnostic.response_shape = shape.join(';');
   result.diagnostic.schema_unknown_keys = String(data && typeof data === 'object' ? Object.keys(data).filter(k => !paths.includes(k)).length : 0);
 }
 async function errorFingerprint(data) {
   try {
     if (typeof diagnosticKey !== 'string' || !/^[a-f0-9]{64}$/.test(diagnosticKey)) return;
-    const values = [data?.message, data?.error_type, data?.payload?.message].map(v => typeof v === 'string' ? v.slice(0, 2048) : '');
+    const values = [data?.message, data?.error_type, data?.payload?.message, data?.payload?.error_type].map(v => typeof v === 'string' ? v.slice(0, 2048) : '');
     if (!values.some(Boolean)) return;
     const bytes = new Uint8Array(diagnosticKey.match(/../g).map(value => parseInt(value, 16)));
     const key = await crypto.subtle.importKey('raw', bytes, {name:'HMAC', hash:'SHA-256'}, false, ['sign']);
@@ -48,12 +65,31 @@ const safeURL = value => {
       (url.hostname.endsWith('.cdninstagram.com') || url.hostname.endsWith('.fbcdn.net')) ? url.href : null;
   } catch { return null; }
 };
-const userID = user => String(user?.pk_id ?? user?.pk ?? user?.id ?? '');
+const stringID = value => typeof value === 'string' ? value : typeof value === 'number' && Number.isSafeInteger(value) ? String(value) : '';
+const userID = user => stringID(user?.pk_id ?? user?.pk ?? user?.id);
 const isAd = item => item?.ad_id != null || item?.is_ad === true || item?.is_sponsored === true || item?.is_paid_partnership === true;
+function decodeJSON(text) {
+  // JSON.parse rounds large numeric IDs before a normal reviver can see them.
+  // Preserve integer tokens outside the exact range, while leaving quoted text,
+  // escapes, fractions and exponents alone. JSON.parse still validates syntax.
+  let preserved = 0;
+  const exact = text.replace(/"(?:[^"\\]|\\[\s\S])*"|(-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/g, (token, number) => {
+    if (number && /^-?\d+$/.test(number) && !Number.isSafeInteger(Number(number))) {
+      preserved += 1; return JSON.stringify(number);
+    }
+    return token;
+  });
+  const data = JSON.parse(exact);
+  result.diagnostic.large_integer_count = String(preserved);
+  return data;
+}
 async function request(path, body = null) {
   let response;
   const fetchStarted = performance.now();
   result.diagnostic.method = body ? 'POST' : 'GET';
+  result.diagnostic.transport_request_index = String(++state.fetchCount);
+  if (state.lastFetch != null) result.diagnostic.since_previous_fetch_ms = String(Math.round(fetchStarted - state.lastFetch));
+  state.lastFetch = fetchStarted;
   if (body) result.diagnostic.request_bytes = String(new TextEncoder().encode(body.toString()).length);
   trace('fetch_started');
   try {
@@ -73,29 +109,60 @@ async function request(path, body = null) {
   result.diagnostic.content_type = !contentType ? 'missing' : contentType.includes('json') ? 'json' : contentType.includes('html') ? 'html' : contentType.startsWith('text/') ? 'text' : 'other';
   const contentLength = response.headers?.get?.('Content-Length');
   if (/^\d{1,12}$/.test(contentLength || '')) result.diagnostic.response_bytes = contentLength;
+  result.diagnostic.response_type = ['basic','cors','opaque','opaqueredirect','default','error'].includes(response.type) ? response.type : 'other';
+  const receivedClaim = response.headers?.get?.('X-IG-Set-WWW-Claim');
+  result.diagnostic.claim_received = receivedClaim == null ? 'absent' : 'rejected';
+  if (typeof receivedClaim === 'string' && /^[\x21-\x7E]{1,2048}$/.test(receivedClaim)) {
+    state.wwwClaim = receivedClaim;
+    result.diagnostic.claim_received = 'accepted';
+  }
   trace('http_received');
   // Error envelopes carry the recovery action even when HTTP itself is 400/403.
   // Keep only recognized categories; never return server text or account details.
-  let data;
+  let data, text = '';
   const decodeStarted = performance.now();
-  try { data = await response.json(); } catch { data = null; }
+  try {
+    text = await response.text();
+    result.diagnostic.response_chars = String(text.length);
+    data = decodeJSON(text);
+    result.diagnostic.json_parse = 'ok';
+  } catch {
+    data = null; result.diagnostic.json_parse = 'invalid';
+    if (text) await errorFingerprint({message:text});
+  }
   result.diagnostic.decode_ms = String(Math.round(performance.now() - decodeStarted));
-  try { result.diagnostic.response_chars = String(JSON.stringify(data).length); responseShape(data); } catch {}
+  try { responseShape(data); } catch {}
   if (!response.ok || data?.status === 'fail') await errorFingerprint(data);
-  const serverReason = [data?.message, data?.error_type].find(value =>
+  const reasons = [['error_type',data?.error_type],['message',data?.message],['payload_error_type',data?.payload?.error_type],['payload_message',data?.payload?.message]];
+  const matchedReason = reasons.find(([, value]) =>
     ['login_required', 'challenge_required', 'checkpoint_required', 'two_factor_required',
-      'feedback_required', 'sentry_block', 'rate_limit_error'].includes(value));
+      'feedback_required', 'sentry_block', 'rate_limit_error', 'user_has_logged_out'].includes(value));
+  let serverReason = matchedReason?.[1];
   const validEnvelope = data && typeof data === 'object' && !Array.isArray(data);
+  const failed = !response.ok || data?.status === 'fail';
+  result.diagnostic.server_status = ['ok','fail'].includes(data?.status) ? data.status : data?.status == null ? 'missing' : 'other';
+  result.diagnostic.challenge_present = Boolean(data?.challenge && typeof data.challenge === 'object').toString();
+  result.diagnostic.two_factor_present = Boolean(data?.two_factor_info && typeof data.two_factor_info === 'object').toString();
+  result.diagnostic.feedback_present = Boolean(data?.feedback_message || data?.feedback_title).toString();
+  result.diagnostic.spam_flag = String(data?.spam === true);
+  result.diagnostic.reason_source = matchedReason?.[0] || 'none';
+  if (!serverReason && failed) {
+    if (result.diagnostic.challenge_present === 'true') serverReason = 'challenge_required';
+    else if (result.diagnostic.two_factor_present === 'true') serverReason = 'two_factor_required';
+    else if (data?.spam === true) serverReason = 'feedback_required';
+    if (serverReason) result.diagnostic.reason_source = 'structure';
+  }
   result.diagnostic.reason = serverReason || (!validEnvelope ? 'invalid_response' :
     response.ok && (!data.status || data.status === 'ok') ? 'none' : 'unclassified');
   trace('decoded');
   if (response.status === 429 || serverReason === 'rate_limit_error') {
     const retry = response.headers?.get?.('Retry-After');
     const seconds = /^\d+$/.test(retry || '') ? Number(retry) : Math.ceil((Date.parse(retry) - Date.now()) / 1000);
-    result.retryAfterSeconds = Math.max(60, Math.min(Number.isFinite(seconds) ? seconds : 60, 86400));
+    result.retryAfterSeconds = Math.max(60, Number.isSafeInteger(seconds) ? seconds : 60);
+    result.diagnostic.retry_after_seconds = String(result.retryAfterSeconds);
     throw new Error('rateLimited');
   }
-  if (['login_required', 'challenge_required', 'checkpoint_required', 'two_factor_required'].includes(serverReason)) throw new Error('signIn');
+  if (['login_required', 'challenge_required', 'checkpoint_required', 'two_factor_required', 'user_has_logged_out'].includes(serverReason)) throw new Error('signIn');
   if (serverReason === 'feedback_required' || serverReason === 'sentry_block') throw new Error('actionBlocked');
   if (response.status === 401 || response.status === 403) throw new Error('signIn');
   if (body && [400, 404, 422].includes(response.status)) throw new Error('sendRejected');
@@ -177,8 +244,8 @@ try {
     state.inboxCursor = nextCursor;
     result.hasMore = Boolean(nextCursor);
     if (operation === 'inbox') { state.threadIDs.clear(); state.openedThreads.clear(); state.threadCursors.clear(); }
-    result.threads = data.inbox.threads.filter(thread => !thread.pending && /^\d+$/.test(String(thread.thread_id))).slice(0, 20).map(thread => {
-      const id = String(thread.thread_id); state.threadIDs.add(id);
+    result.threads = data.inbox.threads.filter(thread => !thread.pending && /^\d+$/.test(stringID(thread.thread_id))).slice(0, 20).map(thread => {
+      const id = stringID(thread.thread_id); state.threadIDs.add(id);
       return {id, title: String(thread.thread_title || thread.users?.map(u => u.username).join(', ') || 'Message').slice(0, 150),
         preview: String(thread.items?.[0]?.text || '').slice(0, 250)};
     });
@@ -197,10 +264,10 @@ try {
     state.openedThreads.add(identifier);
     const ownID = cookie('ds_user_id');
     const names = new Map((data.thread.users || []).map(user => [userID(user),String(user.username || '').slice(0,30)]));
-    result.messages = data.thread.items.filter(item => item.item_id).slice(0, 20).map(item => ({id: String(item.item_id),
+    result.messages = data.thread.items.filter(item => stringID(item.item_id)).slice(0, 20).map(item => ({id: stringID(item.item_id),
       text: String(item.text || ({media:'Photo or video',voice_media:'Voice message',media_share:'Shared post',clip:'Shared Reel',link:item.link?.text || 'Shared link',like:'Heart'}[item.item_type]) || (item.item_type === 'text' ? '' : 'Unsupported attachment')).slice(0, 4000),
-      sender: names.get(String(item.user_id)) || null,
-      mine: String(item.user_id) === ownID, context: item.client_context ? String(item.client_context) : null})).reverse();
+      sender: names.get(stringID(item.user_id)) || null,
+      mine: stringID(item.user_id) === ownID, context: item.client_context ? stringID(item.client_context) : null})).reverse();
   } else if (operation === 'sendText') {
     result.diagnostic.thread_allowed = String(state.threadIDs.has(identifier));
     result.diagnostic.thread_opened = String(state.openedThreads.has(identifier));
@@ -218,19 +285,19 @@ try {
       const body = new URLSearchParams({action: 'send_item', thread_ids: '[' + identifier + ']', text: messageText,
         client_context: clientContext, mutation_token: clientContext, offline_threading_id: clientContext});
       const data = await request('/api/v1/direct_v2/threads/broadcast/text/', body);
-      const itemID = data.payload?.item_id;
-      result.diagnostic.receipt_present = String(itemID != null);
-      result.diagnostic.receipt_thread_matches = String(!data.payload?.thread_id || String(data.payload.thread_id) === identifier);
-      result.diagnostic.receipt_context_matches = String(!data.payload?.client_context || String(data.payload.client_context) === clientContext);
+      const itemID = stringID(data.payload?.item_id);
+      result.diagnostic.receipt_present = String(data.payload?.item_id != null);
+      result.diagnostic.receipt_thread_matches = String(!data.payload?.thread_id || stringID(data.payload.thread_id) === identifier);
+      result.diagnostic.receipt_context_matches = String(!data.payload?.client_context || stringID(data.payload.client_context) === clientContext);
       trace('receipt');
-      if (data.status !== 'ok' || !['string','number'].includes(typeof itemID) || !/^[A-Za-z0-9_-]{1,128}$/.test(String(itemID))) {
+      if (data.status !== 'ok' || !/^[A-Za-z0-9_-]{1,128}$/.test(itemID)) {
         result.diagnostic.reason = 'missing_receipt'; throw new Error('sendUnconfirmed');
       }
-      if ((data.payload.thread_id && String(data.payload.thread_id) !== identifier) ||
-          (data.payload.client_context && String(data.payload.client_context) !== clientContext)) {
+      if ((data.payload.thread_id && stringID(data.payload.thread_id) !== identifier) ||
+          (data.payload.client_context && stringID(data.payload.client_context) !== clientContext)) {
         result.diagnostic.reason = 'receipt_mismatch'; throw new Error('sendUnconfirmed');
       }
-      result.sentItemID = String(itemID);
+      result.sentItemID = itemID;
       state.sentContexts.set(clientContext, result.sentItemID);
       if (state.sentContexts.size > 100) state.sentContexts.delete(state.sentContexts.keys().next().value);
     }

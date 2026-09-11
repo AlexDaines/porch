@@ -1,12 +1,12 @@
 # Local diagnostics
 
-Build 9 records diagnostics in Release as well as Debug. Settings → Diagnostics shows storage health and the latest failure. **Share log** produces `Porch-diagnostics.json` and opens the iOS share sheet. No automatic upload, analytics service, remote endpoint or Porch account is involved.
+Build 10 extends the persistent diagnostics introduced in build 9 and records diagnostics in Release as well as Debug. Settings → Diagnostics shows storage health and the latest failure. **Share log** produces `Porch-diagnostics.json` and opens the iOS share sheet. No automatic upload, analytics service, remote endpoint or Porch account is involved.
 
 ## Following a failed send
 
 1. Find `sendPrepared` and its `attempt_id`. `thread_ref` and `context_ref` are installation-keyed HMACs; they reveal neither the conversation ID nor the outgoing message context.
 2. Join `context_ref` to `requestQueued`, then follow its `request_id` through `requestStarted` and `adapterStage`. Stages show validation, fetch start, HTTP arrival, decode, receipt and completion. An HTTP result can be recorded before parsing fails.
-3. Read `http`, the fixed `reason` and `result`, request/response sizes, timings, CSRF/viewer presence, response shape and receipt-match flags. `response_shape` contains allowlisted field names and types only. `server_fingerprint` groups identical unknown server errors within one installation without exporting their text.
+3. Read `requestContext` for cookie-jar presence, then `http`, the fixed `reason`, `reason_source` and `result`, request/response sizes, timings, CSRF/viewer presence, response shape and receipt-match flags. `response_shape` contains allowlisted field names and types only. `server_fingerprint` groups identical unknown server errors within one installation without exporting their text, including non-JSON failures. `json_parse`, `server_status`, structural challenge/feedback flags and the content type distinguish refusal envelopes from malformed or HTML responses.
 4. Follow `sendReceipt`, `sendRefused` or `sendUnconfirmed`. After an exit, `sendRestored` and `sendReconciled` retain the attempt correlation. A receipt means acknowledged by Instagram, not delivered or read. Logging never sends or retries a message.
 
 Every report includes the current app/build, iOS version and hardware family even when the launch event has rotated out. Every event has a wall-clock timestamp (milliseconds since Unix epoch), monotonic process uptime, process session UUID and sequence. Request timing fields are milliseconds. `bridge_ms` measures the full JavaScript call; it includes fetch and decode time, so these durations must not be summed. `raw_count` and `filtered_count` describe one bounded response. Correlation references persist across app updates while the local key remains available; reinstalling or losing its protected key changes them.
@@ -18,12 +18,14 @@ Every report includes the current app/build, iOS version and hardware family eve
 | App | Version/build, iOS version, hardware family, lifecycle, low-power/thermal state, memory warnings |
 | Network | Availability, interface category, constrained/expensive status, IPv4/IPv6/DNS capability; no IPs, SSIDs or endpoints |
 | Sign-in | User entry/cancellation, local session hint, verification result, suppressed checks, navigation category, HTTP status, page failures, cookie-change event without cookie values |
-| Transport | Queue depth/delay, generation, WebKit preparation/failure/termination, request stages, sizes, duration, outcome, bounded model counts |
+| Transport | Queue depth/delay, generation, WebKit preparation/failure/termination, document/location origin categories, browser family, cookie-jar presence, claim bootstrap/update/reset categories, request sequence/interval, stages, sizes, parse outcome, preserved-large-integer count, duration, outcome, bounded model counts |
 | Messages | Input length, membership/context validation flags, prepared/dispatched attempt, receipt matching, rejection, uncertainty and reconciliation |
 | Media | Start/readiness/first playback/stop/failure; keyed URL reference, timing and known error domain/code with bounded underlying error codes; no per-frame event stream |
 | iOS diagnostics | MetricKit crash, hang, CPU, disk and launch diagnostics with at most 64 binary UUID/offset frames; payload time range and originating app version |
 
 MetricKit delivery is controlled by iOS and can be delayed or absent, especially under a debugger. The log does not intercept signals or claim to capture every crash, force-quit or memory termination. Binary coordinates require matching archived dSYMs for symbolication; preserve the release archive used for distribution. Crash exception descriptions, raw MetricKit payloads and register contents are deliberately excluded.
+
+Cookie-jar snapshots are requested asynchronously after WebKit prepares and before sends; dispatch does not wait for them. Their event timestamps identify when the results arrive. They contain presence flags for the session, CSRF, account and browser-device cookies, not values, domains, paths or expiration dates. Presence in the jar does not prove transmission. Actual document-origin categories supplement the fixed request-target label; `ua_family` and mobile/Safari flags classify WebKit without exporting a raw user-agent string. Claim values remain exclusively in the isolated adapter; logs record whether a claim was bootstrapped, received, reused or reset. Request intervals apply to a single transport, not a global request quota. See [the request audit and wire-test limits](REQUESTS.md).
 
 ## Storage and privacy contract
 

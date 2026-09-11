@@ -22,6 +22,9 @@ final class DataAdapterTests: XCTestCase {
         """#)
         let savedHint = try await harness.request("sessionHint")
         XCTAssertEqual(savedHint.diagnostic["savedSession"], "present")
+        XCTAssertTrue(harness.traces.filter { $0["operation"] == "sessionHint" }.allSatisfy {
+            DiagnosticsLog.sanitize($0)["discarded_field_count"] == nil
+        }, "The local session hint must survive the production diagnostic schema")
         let session = try await harness.request("session")
         XCTAssertNil(session.error)
         XCTAssertTrue(session.posts.isEmpty && session.stories.isEmpty && session.threads.isEmpty && session.messages.isEmpty)
@@ -268,6 +271,94 @@ final class DataAdapterTests: XCTestCase {
             XCTAssertNil(InstagramPost.Media.mediaURL(url))
         }
     }
+
+    func testLargeNumericIDsRemainExactThroughReceiptAndOutgoingForm() async throws {
+        let harness = AdapterHarness(); try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'csrftoken=PRIVATE_CSRF; path=/';
+        globalThis.pages = [
+          {__raw:'{"inbox":{"threads":[{"thread_id":123456789012345678901234567890123456}]}}'},
+          {__raw:'{"thread":{"items":[{"item_id":123456789012345678901234567890123457,"text":"Digits 12345678901234567890 and \\"quotes\\"","user_id":7}],"ratio":1.25,"exponent":1e3}}'},
+          {__raw:'{"status":"ok","payload":{"item_id":123456789012345678901234567890123458,"thread_id":123456789012345678901234567890123456,"client_context":1234567890123456789}}'}
+        ];
+        """#)
+        let id = "123456789012345678901234567890123456"
+        let inbox = try await harness.request("inbox")
+        XCTAssertEqual(inbox.threads.first?.id, id)
+        XCTAssertEqual(inbox.diagnostic["large_integer_count"], "1")
+        let thread = try await harness.request("thread", identifier: id)
+        XCTAssertEqual(thread.messages.first?.id, "123456789012345678901234567890123457")
+        XCTAssertEqual(thread.messages.first?.text, "Digits 12345678901234567890 and \"quotes\"")
+        let sent = try await harness.request("sendText", identifier: id, message: "PRIVATE_DRAFT")
+        XCTAssertNil(sent.error)
+        XCTAssertEqual(sent.sentItemID, "123456789012345678901234567890123458")
+        XCTAssertEqual(sent.diagnostic["large_integer_count"], "3")
+        let encoded = try await harness.script("return new URLSearchParams(calls[2].options.body).get('thread_ids');") as? String
+        XCTAssertEqual(encoded, "[" + id + "]")
+        XCTAssertFalse(harness.traces.description.contains(id))
+        XCTAssertFalse(harness.traces.description.contains("PRIVATE"))
+    }
+
+    func testServerClaimIsReusedOnlyWithinItsAccountAndCSRFContext() async throws {
+        let harness = AdapterHarness(); try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'ds_user_id=7; path=/';
+        document.cookie = 'csrftoken=PRIVATE_CSRF_A; path=/';
+        globalThis.pages = [
+          {__headers:{'X-IG-Set-WWW-Claim':'PRIVATE_CLAIM_A'},inbox:{threads:[]}},
+          {__headers:{'X-IG-Set-WWW-Claim':'PRIVATE_CLAIM_B'},inbox:{threads:[]}},
+          {inbox:{threads:[]}}, {inbox:{threads:[]}},
+          {__headers:{'X-IG-Set-WWW-Claim':'PRIVATE\r\nBAD'},inbox:{threads:[]}},
+          {inbox:{threads:[]}}
+        ];
+        """#)
+        let first = try await harness.request("inbox")
+        XCTAssertEqual(first.diagnostic["claim_sent"], "bootstrap")
+        XCTAssertEqual(first.diagnostic["claim_received"], "accepted")
+        let second = try await harness.request("inbox")
+        XCTAssertEqual(second.diagnostic["claim_sent"], "server")
+        try await harness.script("document.cookie = 'csrftoken=PRIVATE_CSRF_B; path=/';")
+        _ = try await harness.request("inbox")
+        try await harness.script("document.cookie = 'ds_user_id=8; path=/';")
+        let changed = try await harness.request("inbox")
+        XCTAssertEqual(changed.diagnostic["account_changed"], "true")
+        let invalid = try await harness.request("inbox")
+        XCTAssertEqual(invalid.diagnostic["claim_received"], "rejected")
+        _ = try await harness.request("inbox")
+        let claims = try await harness.script("return calls.map(c=>c.options.headers['X-IG-WWW-Claim']);") as? [String]
+        XCTAssertEqual(claims, ["0", "PRIVATE_CLAIM_A", "0", "0", "0", "0"])
+        XCTAssertFalse(harness.traces.description.contains("PRIVATE"))
+        XCTAssertTrue(harness.traces.allSatisfy { $0.count <= DiagnosticsLog.maximumFields })
+        XCTAssertTrue(harness.traces.allSatisfy { DiagnosticsLog.sanitize($0)["discarded_field_count"] == nil })
+    }
+
+    func testNestedAndStructuredServerRefusalsRetainPrivateReasonEvidence() async throws {
+        let harness = AdapterHarness(); try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'csrftoken=PRIVATE_CSRF; path=/';
+        globalThis.pages = [{inbox:{threads:[{thread_id:'21'}]}},{thread:{items:[]}},
+          {__http:400,status:'fail',message:'PRIVATE',payload:{error_type:'sentry_block'}},
+          {__http:400,status:'fail',message:'PRIVATE',challenge:{url:'PRIVATE'}},
+          {__http:400,status:'fail',message:'PRIVATE',two_factor_info:{id:'PRIVATE'}},
+          {__http:400,status:'fail',message:'PRIVATE',spam:true},
+          {__http:429,__headers:{'Retry-After':'172800'},status:'fail'},
+          {__http:400,__headers:{'Content-Type':'text/html'},__raw:'<html>PRIVATE</html>'}];
+        """#)
+        _ = try await harness.request("inbox"); _ = try await harness.request("thread", identifier: "21")
+        let cases = [("actionBlocked","payload_error_type"),("signIn","structure"),("signIn","structure"),("actionBlocked","structure"),("rateLimited","none"),("sendRejected","none")]
+        for (index, expected) in cases.enumerated() {
+            let result = try await harness.request("sendText", identifier: "21", message: "PRIVATE_DRAFT", context: String(1_234_567_890_123_456_789 + index))
+            XCTAssertEqual(result.error, expected.0)
+            XCTAssertEqual(result.diagnostic["reason_source"], expected.1)
+            XCTAssertFalse(result.diagnostic.description.contains("PRIVATE"))
+            if index == 4 { XCTAssertEqual(result.diagnostic["retry_after_seconds"], "172800") }
+            if index == 5 { XCTAssertEqual(result.diagnostic["server_fingerprint"]?.count, 64); XCTAssertEqual(result.diagnostic["json_parse"], "invalid"); XCTAssertEqual(result.diagnostic["content_type"], "html") }
+        }
+        XCTAssertTrue(harness.traces.allSatisfy { $0.count <= DiagnosticsLog.maximumFields })
+        XCTAssertTrue(harness.traces.allSatisfy { DiagnosticsLog.sanitize($0)["discarded_field_count"] == nil })
+        let count = try await harness.script("return calls.length;") as? Int
+        XCTAssertEqual(count, 8)
+    }
 }
 
 @MainActor
@@ -295,7 +386,9 @@ private final class AdapterHarness: NSObject, WKNavigationDelegate {
           calls.push({path,options});
           const body = pages.shift();
           const status = body.__http || 200;
-          return {status,ok:status === 200,json:async()=>body};
+          return {status,ok:status === 200,type:'basic',
+            headers:{get:name=>Object.entries(body.__headers || {'Content-Type':'application/json'}).find(([key])=>key.toLowerCase()===name.toLowerCase())?.[1] ?? null},
+            text:async()=>body.__raw ?? JSON.stringify(body),json:async()=>body.__raw ? JSON.parse(body.__raw) : body};
         };
         """#)
     }

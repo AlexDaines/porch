@@ -1,6 +1,20 @@
 # Verification
 
-September 11, 2026. Porch **0.2 (9)** is built locally and installed on the operator's phone; the exact bundle/build was read back after installation and launch succeeded. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 11, 2026. Porch **0.2 (10)** is built locally and installed on the operator's phone; its exact bundle/build was independently read back. The first build 10 launch verified the new on-device diagnostic fields. The final schema correction is installed, but automatic launch was declined while the phone required a passcode. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
+
+## Request compatibility refinement
+
+Build 10 preserves large numeric JSON identifiers, consumes server-issued web claim updates within the original browser/account/CSRF context, recognizes nested/structured refusal reasons and respects active-session Retry-After values longer than one day. Cookie metadata is sampled asynchronously without delaying dispatch. Origin/browser categories, claim state, request cadence, parse evidence and private fingerprints supplement the existing persistent log.
+
+The full offline suite passed **46 test definitions**, with no failures or skips (`artifacts/private/refinement-full.xcresult`). After the final non-blocking cookie observation and copied-reason cleanup, all **40 unit/adapter definitions** passed again (`artifacts/private/refinement-final-unit.xcresult`). The physical trace then exposed the existing `savedSession` hint missing from the closed diagnostic schema. Its fixed present/absent values are now accepted; the focused session/diagnostics suite passed again (8 tests, `artifacts/private/refinement-schema-final.xcresult`). No application screens changed. The existing fictional rejection, restart/export and uncertain-send reconciliation UI flows passed in the full run.
+
+A real iOS WebKit loopback test compared an empty local document/client world with an ordinary loaded HTML page/page world. Both sent the same default user agent, the synthetic session/CSRF data, the returned claim, a matching POST Origin and the same Fetch Metadata categories. Referer paths differed as expected. Only fictional requests reached a loopback HTTP server; no Instagram message was sent. The initial loopback cookie fixture was corrected to use server Set-Cookie responses before the comparison passed. [Request audit](docs/REQUESTS.md) records the method, results and limits.
+
+The final unsigned Release archive is `.build-uat/Porch.xcarchive` (0.2 / 10); build 9 is preserved at `.build-uat/Porch-0.2-9.xcarchive`. Fixture launch switches are absent from Release, diagnostic events remain present, the adapter matches source, and the executable/dSYM UUIDs match: `D4FBBCE4-84F0-305F-AC99-92A7AAA10694`. Archive log: `artifacts/private/refinement-release-final.log`.
+
+The first build 10 phone launch recorded 13 events, including the new cookie-jar metadata and a successful local-only session hint. The actual device reported an Instagram document/location origin, a secure context and the default iOS WebKit family. Its saved-session field exposed the schema omission corrected above. The final signed bundle passed macOS signature verification, installed successfully and was independently read back as 0.2 (10); automatic launch then failed the iOS preflight. A separate lock-state query confirmed that a passcode was required. Final launch/log verification awaits opening the app on the phone. Evidence: `artifacts/private/refinement-device-install-final.log`, `build10-installed-final.json`, `build10-signature-verification.txt`, `build10-lock-state.json` and `build10-phone-verification.json`.
+
+The available build 9 phone trace contains a session-verification timeout and no DM attempt. It does not establish the cause of the earlier build 7 HTTP 400. Device traces and all account-bearing artifacts remain private.
 
 ## Durable diagnostics
 
@@ -50,7 +64,7 @@ On September 11, after the operator confirmed that the unsent draft was only a d
 
 The code revision `75f7af1` also passed [GitHub's offline and Release checks](https://github.com/AlexDaines/porch/actions/runs/34581007069).
 
-The unsigned device Release archive succeeded at `.build-uat/Porch.xcarchive`; its version/build are 0.2/9. The previous build 8 archive is preserved at `.build-uat/Porch-0.2-8.xcarchive`. Debug fixture and authentication-bypass launch flags are absent from the Release executable, and the bundled adapter matches the verified source. The Release binary contains the durable log/export and crash-event code; its dSYM UUID matches the app binary (`83E990C8-81E1-3679-A1A2-58D726095990`). Signing/distribution remain with the operator's homegrown workflow. Earlier build 2 had four passing physical-device playback and fictional-composer checks; those are historical evidence, not acceptance of build 9.
+The historical build 9 unsigned device Release archive is preserved at `.build-uat/Porch-0.2-9.xcarchive`; its version/build are 0.2/9. The previous build 8 archive is preserved at `.build-uat/Porch-0.2-8.xcarchive`. Debug fixture and authentication-bypass launch flags are absent from that Release executable, and its bundled adapter matches the source verified for build 9. That Release binary contains the durable log/export and crash-event code; its dSYM UUID matches the app binary (`83E990C8-81E1-3679-A1A2-58D726095990`). Signing/distribution remain with the operator's homegrown workflow. Earlier build 2 had four passing physical-device playback and fictional-composer checks; those are historical evidence, not acceptance of build 9.
 
 ## Before friend UAT
 

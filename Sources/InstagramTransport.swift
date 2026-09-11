@@ -49,11 +49,22 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
                 if operation == "sendText" { await self.diagnostics.flush() }
                 try Task.checkCancellation()
                 guard epoch == self.generation else { throw CancellationError() }
+                let needsContext = !self.ready || operation == "sendText"
                 try await self.prepare()
                 try Task.checkCancellation()
                 guard epoch == self.generation else { throw CancellationError() }
                 guard let view = self.webView,
                   let path = Bundle.main.url(forResource: "instagram-data", withExtension: "js") else { throw URLError(.cannotLoadFromNetwork) }
+                if needsContext {
+                    let log = self.diagnostics
+                    let contextFields = ["request_id": id.uuidString, "transport_id": self.transportID,
+                        "generation": String(epoch), "cookie_store": view.configuration.websiteDataStore.isPersistent ? "persistent" : "ephemeral"]
+                    // Observation must not hold up dispatch. The event timestamp
+                    // identifies when this asynchronous jar snapshot arrived.
+                    view.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+                        log.record(.requestContext, contextFields.merging(Self.cookieDiagnostics(cookies)) { _, new in new })
+                    }
+                }
                 let script = try String(contentsOf: path, encoding: .utf8)
                 let started = Date()
                 let value = try await view.callAsyncJavaScript(script, arguments: ["operation": operation, "identifier": identifier,
@@ -72,7 +83,7 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
                 trace["has_more"] = String(result.hasMore)
                 self.diagnostics.record(.requestCompleted, trace)
                 if result.error == "rateLimited" {
-                    self.retryAfter = Date().addingTimeInterval(Double(max(60,min(result.retryAfterSeconds ?? 60,86400))))
+                    self.retryAfter = Date().addingTimeInterval(Double(max(60, result.retryAfterSeconds ?? 60)))
                 }
                 if self.activeRequestID == id.uuidString { self.activeRequestID = nil }
                 return result
@@ -89,6 +100,19 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
         tail = task
         defer { tasks[id] = nil; if tasks.isEmpty { tail = nil } }
         return try await task.value
+    }
+
+    // Cookie-jar metadata only; presence does not prove that a request sent it.
+    // Values, domains, paths and expiry dates never enter the diagnostic object.
+    nonisolated static func cookieDiagnostics(_ cookies: [HTTPCookie]) -> [String: String] {
+        let instagram = cookies.filter {
+            ["instagram.com", "www.instagram.com"].contains($0.domain.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))) &&
+            ($0.expiresDate == nil || $0.expiresDate! > Date())
+        }
+        let names = Set(instagram.map(\.name))
+        return ["cookie_count": String(instagram.count), "session_cookie_present": String(names.contains("sessionid")),
+                "csrf_cookie_present": String(names.contains("csrftoken")), "viewer_cookie_present": String(names.contains("ds_user_id")),
+                "device_cookie_present": String(names.contains("ig_did")), "machine_cookie_present": String(names.contains("mid"))]
     }
 
     private func prepare() async throws {
@@ -157,7 +181,7 @@ private final class DiagnosticScriptSink: NSObject, WKScriptMessageHandler {
     init(receive: @escaping (String, [String: String]) -> Void) { self.receive = receive }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let body = message.body as? [String: Any], let trace = body["trace"] as? String,
-              UUID(uuidString: trace) != nil, let fields = body["fields"] as? [String: String], fields.count <= 64 else { return }
+              UUID(uuidString: trace) != nil, let fields = body["fields"] as? [String: String], fields.count <= DiagnosticsLog.maximumFields else { return }
         receive(trace, DiagnosticsLog.sanitize(fields))
     }
 }

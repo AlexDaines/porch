@@ -10,6 +10,26 @@ final class DiagnosticsLogTests: XCTestCase {
         if FileManager.default.fileExists(atPath: directory.path) { try FileManager.default.removeItem(at: directory) }
     }
 
+    func testRequestContextExportsCategoriesWithoutCookiesClaimsOrDeviceIdentifiers() async throws {
+        let cookie = try XCTUnwrap(HTTPCookie(properties: [.domain: ".instagram.com", .path: "/", .name: "sessionid", .value: "PRIVATE_SESSION"]))
+        let foreign = try XCTUnwrap(HTTPCookie(properties: [.domain: "foreign.example", .path: "/", .name: "ig_did", .value: "PRIVATE_DEVICE"]))
+        let fields = WebKitInstagramTransport.cookieDiagnostics([cookie, foreign])
+        XCTAssertEqual(fields["session_cookie_present"], "true")
+        XCTAssertEqual(fields["device_cookie_present"], "false")
+        XCTAssertEqual(fields["cookie_count"], "1")
+        let log = DiagnosticsLog(directory: directory)
+        log.record(.requestContext, fields.merging(["cookie_store": "persistent", "cookie": "PRIVATE_COOKIE"]) { _, new in new })
+        log.record(.adapterStage, ["document_origin": "instagram_web", "location_origin": "opaque", "ua_family": "ios_webkit",
+            "claim_sent": "server", "claim_received": "accepted", "large_integer_count": "2", "reason_source": "payload_error_type",
+            "claim": "PRIVATE_CLAIM", "user_agent": "PRIVATE_AGENT", "document_url": "https://PRIVATE.example/", "response_shape": "spam=boolean;payload.error_type=string"])
+        let export = try await log.export()
+        let text = try String(contentsOf: export, encoding: .utf8)
+        XCTAssertFalse(text.contains("PRIVATE"))
+        XCTAssertTrue(text.contains("session_cookie_present"))
+        XCTAssertTrue(text.contains("payload_error_type"))
+        XCTAssertTrue(text.contains("ios_webkit"))
+    }
+
     func testDurableExportCorrelatesAcrossLaunchesWithoutPrivateValues() async throws {
         let first = DiagnosticsLog(directory: directory)
         let reference = first.reference("PRIVATE_THREAD")
