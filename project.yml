@@ -7,7 +7,7 @@ settings:
   base:
     CODE_SIGN_STYLE: Automatic
     MARKETING_VERSION: "0.2"
-    CURRENT_PROJECT_VERSION: "7"
+    CURRENT_PROJECT_VERSION: "8"
 targets:
   Porch:
     type: application

@@ -26,19 +26,28 @@ async function request(path, body = null) {
     throw new Error(error.name === 'TimeoutError' || error.name === 'AbortError' ? 'timedOut' : 'offline');
   }
   result.diagnostic = {route: operation, http: String(response.status)};
-  if (response.status === 429) {
+  // Error envelopes carry the recovery action even when HTTP itself is 400/403.
+  // Keep only recognized categories; never return server text or account details.
+  let data;
+  try { data = await response.json(); } catch { data = null; }
+  const serverReason = [data?.message, data?.error_type].find(value =>
+    ['login_required', 'challenge_required', 'checkpoint_required', 'two_factor_required',
+      'feedback_required', 'sentry_block', 'rate_limit_error'].includes(value));
+  const validEnvelope = data && typeof data === 'object' && !Array.isArray(data);
+  result.diagnostic.reason = serverReason || (!validEnvelope ? 'invalid_response' :
+    response.ok && (!data.status || data.status === 'ok') ? 'none' : 'unclassified');
+  if (response.status === 429 || serverReason === 'rate_limit_error') {
     const retry = response.headers?.get?.('Retry-After');
     const seconds = /^\d+$/.test(retry || '') ? Number(retry) : Math.ceil((Date.parse(retry) - Date.now()) / 1000);
     result.retryAfterSeconds = Math.max(60, Math.min(Number.isFinite(seconds) ? seconds : 60, 86400));
     throw new Error('rateLimited');
   }
+  if (['login_required', 'challenge_required', 'checkpoint_required', 'two_factor_required'].includes(serverReason)) throw new Error('signIn');
+  if (serverReason === 'feedback_required' || serverReason === 'sentry_block') throw new Error('actionBlocked');
   if (response.status === 401 || response.status === 403) throw new Error('signIn');
   if (body && [400, 404, 422].includes(response.status)) throw new Error('sendRejected');
-  let data;
-  try { data = await response.json(); } catch { throw new Error(body ? 'sendUnconfirmed' : 'unsupported'); }
+  if (!validEnvelope) throw new Error(body ? 'sendUnconfirmed' : 'unsupported');
   if (!response.ok || (data.status && data.status !== 'ok')) {
-    if (data.message === 'login_required') throw new Error('signIn');
-    if (data.message === 'challenge_required' || data.message === 'checkpoint_required') throw new Error('signIn');
     throw new Error(body ? 'sendUnconfirmed' : 'unavailable');
   }
   return data;
@@ -145,15 +154,19 @@ try {
         client_context: clientContext, mutation_token: clientContext, offline_threading_id: clientContext});
       const data = await request('/api/v1/direct_v2/threads/broadcast/text/', body);
       const itemID = data.payload?.item_id;
-      if (data.status !== 'ok' || !['string','number'].includes(typeof itemID) || !/^[A-Za-z0-9_-]{1,128}$/.test(String(itemID))) throw new Error('sendUnconfirmed');
-      if (data.payload.thread_id && String(data.payload.thread_id) !== identifier) throw new Error('sendUnconfirmed');
-      if (data.payload.client_context && String(data.payload.client_context) !== clientContext) throw new Error('sendUnconfirmed');
+      if (data.status !== 'ok' || !['string','number'].includes(typeof itemID) || !/^[A-Za-z0-9_-]{1,128}$/.test(String(itemID))) {
+        result.diagnostic.reason = 'missing_receipt'; throw new Error('sendUnconfirmed');
+      }
+      if ((data.payload.thread_id && String(data.payload.thread_id) !== identifier) ||
+          (data.payload.client_context && String(data.payload.client_context) !== clientContext)) {
+        result.diagnostic.reason = 'receipt_mismatch'; throw new Error('sendUnconfirmed');
+      }
       result.sentItemID = String(itemID);
       state.sentContexts.set(clientContext, result.sentItemID);
       if (state.sentContexts.size > 100) state.sentContexts.delete(state.sentContexts.keys().next().value);
     }
   } else { throw new Error('unavailable'); }
 } catch (error) {
-  result.error = ['rateLimited', 'signIn', 'unsupported', 'unavailable', 'offline', 'timedOut', 'invalidMessage', 'sendRejected', 'sendUnconfirmed'].includes(error.message) ? error.message : 'unavailable';
+  result.error = ['rateLimited', 'signIn', 'actionBlocked', 'unsupported', 'unavailable', 'offline', 'timedOut', 'invalidMessage', 'sendRejected', 'sendUnconfirmed'].includes(error.message) ? error.message : 'unavailable';
 }
 return JSON.stringify(result);

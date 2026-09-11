@@ -111,6 +111,39 @@ final class InstagramDataClientTests: XCTestCase {
         XCTAssertEqual(transport.calls.count,2)
         XCTAssertNil(client.error)
     }
+
+    func testRejectedSendKeepsDraftAndDiagnosticAfterConversationRefresh() async throws {
+        let transport = StubTransport()
+        transport.results = [.init(threads:[.init(id:"21",title:"Fixture",preview:"")]),
+                             .init(error:"actionBlocked",diagnostic:["http":"400","reason":"feedback_required","message":"PRIVATE SERVER TEXT"]),
+                             .init(diagnostic:["http":"200"])]
+        let client = InstagramDataClient(transport:transport,defaults:defaults())
+        await client.load(.messages)
+        client.keepDraft("PRIVATE DRAFT", for:"21")
+        let outcome = await client.sendText("PRIVATE DRAFT",to:"21")
+        XCTAssertEqual(outcome,"actionBlocked")
+        XCTAssertNil(client.pendingSends["21"], "Explicit refusal resolves the attempt, without retrying")
+        XCTAssertEqual(client.drafts["21"],"PRIVATE DRAFT")
+        _ = try await client.request("thread",identifier:"21")
+        XCTAssertTrue(client.diagnostic.contains("HTTP: 200"))
+        XCTAssertTrue(client.lastSendDiagnostic?.contains("HTTP: 400") == true)
+        XCTAssertTrue(client.lastSendDiagnostic?.contains("Reason: feedback_required") == true)
+        XCTAssertFalse(client.lastSendDiagnostic?.contains("PRIVATE") == true)
+        XCTAssertEqual(transport.calls,["inbox","sendText","thread"])
+        client.clearJournal()
+        XCTAssertNil(client.lastSendDiagnostic)
+    }
+
+    func testDiagnosticRejectsUnexpectedServerReason() async {
+        let transport = StubTransport()
+        transport.results = [.init(threads:[.init(id:"21",title:"Fixture",preview:"")]),
+                             .init(error:"sendRejected",diagnostic:["http":"400","reason":"PRIVATE TOKEN"])]
+        let client = InstagramDataClient(transport:transport,defaults:defaults())
+        await client.load(.messages)
+        _ = await client.sendText("PRIVATE DRAFT",to:"21")
+        XCTAssertTrue(client.lastSendDiagnostic?.contains("Reason: none") == true)
+        XCTAssertFalse(client.lastSendDiagnostic?.contains("PRIVATE") == true)
+    }
 }
 
 @MainActor

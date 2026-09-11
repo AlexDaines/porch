@@ -18,9 +18,10 @@ struct LoadFailure: View {
         case "timedOut": "Instagram took too long to respond."
         case "signIn": "Sign in to Instagram to continue."
         case "rateLimited": "Instagram asked us to wait. Try again in a little while."
+        case "actionBlocked": "Instagram restricted this action. Open Instagram to review it."
         case "unsupported": "Instagram returned a view Porch couldn't read."
         case "invalidMessage": "Enter a message of up to 1,000 characters."
-        case "sendRejected": "Instagram didn't accept this message. Your draft is still here."
+        case "sendRejected": "Porch couldn't send this message. Your draft is still here."
         case "sendUnconfirmed": "Sending wasn't confirmed. The message may have arrived. Check the conversation before sending again."
         default: "Couldn't load this view. Try again."
         }

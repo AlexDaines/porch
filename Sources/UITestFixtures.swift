@@ -29,6 +29,9 @@ private final class UITestTransport: InstagramTransport {
         case "inbox": return .init(threads:[.init(id:"21",title:"UAT fixture",preview:messages.last?.text ?? "")])
         case "thread": return .init(messages:messages)
         case "sendText":
+            if ProcessInfo.processInfo.arguments.contains("--uat-blocked") {
+                return .init(error:"actionBlocked",diagnostic:["http":"400","reason":"feedback_required"])
+            }
             messages.append(.init(id:UUID().uuidString,text:text,mine:true,context:context))
             if ProcessInfo.processInfo.arguments.contains("--uat-unconfirmed") { return .init(error:"sendUnconfirmed") }
             return .init(sentItemID:messages.last?.id)

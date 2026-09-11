@@ -196,6 +196,46 @@ final class DataAdapterTests: XCTestCase {
         XCTAssertTrue(paths?[3].contains("cursor=older%20messages") == true)
     }
 
+    func testSendErrorEnvelopeIsReadBeforeHTTPRejectionAndStaysPrivate() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        try await harness.script(#"""
+        document.cookie = 'csrftoken=fixture-csrf; path=/';
+        globalThis.pages = [
+          {inbox:{threads:[{thread_id:'21'}]}}, {thread:{items:[]}},
+          {__http:400,status:'fail',message:'challenge_required',challenge:{url:'PRIVATE CHALLENGE'}},
+          {__http:400,status:'fail',message:'checkpoint_required'},
+          {__http:400,status:'fail',error_type:'two_factor_required'},
+          {__http:400,status:'fail',message:'login_required'},
+          {__http:400,status:'fail',error_type:'rate_limit_error'},
+          {__http:400,status:'fail',message:'feedback_required',feedback_message:'PRIVATE SERVER TEXT'},
+          {__http:403,status:'fail',error_type:'sentry_block'},
+          {__http:422,status:'fail',message:'PRIVATE MESSAGE',error_type:'PRIVATE TOKEN'},
+          {__http:503,status:'fail',message:'PRIVATE MESSAGE'},
+          {status:'ok'}
+        ];
+        """#)
+        _ = try await harness.request("inbox")
+        _ = try await harness.request("thread", identifier:"21")
+        let cases = [("signIn","challenge_required"), ("signIn","checkpoint_required"),
+                     ("signIn","two_factor_required"), ("signIn","login_required"),
+                     ("rateLimited","rate_limit_error"), ("actionBlocked","feedback_required"),
+                     ("actionBlocked","sentry_block"), ("sendRejected","unclassified"),
+                     ("sendUnconfirmed","unclassified"), ("sendUnconfirmed","missing_receipt")]
+        for (index, expected) in cases.enumerated() {
+            let result = try await harness.request("sendText", identifier:"21", message:"PRIVATE DRAFT",
+                                                   context:String(1_234_567_890_123_456_789 + index))
+            XCTAssertEqual(result.error, expected.0)
+            XCTAssertEqual(result.diagnostic["reason"], expected.1)
+            XCTAssertNil(result.sentItemID)
+            XCTAssertFalse(result.diagnostic.description.contains("PRIVATE"))
+            XCTAssertTrue(result.messages.isEmpty && result.threads.isEmpty)
+            if expected.0 == "rateLimited" { XCTAssertEqual(result.retryAfterSeconds, 60) }
+        }
+        let count = try await harness.script("return calls.length;") as? Int
+        XCTAssertEqual(count, 12, "Each explicit operation dispatches once, with no hidden send retries")
+    }
+
     func testNativeMediaRejectsForeignAndCredentialBearingURLs() {
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://s.cdninstagram.com/image.jpg"))
         XCTAssertNotNil(InstagramPost.Media.mediaURL("https://v.fbcdn.net/video.mp4"))

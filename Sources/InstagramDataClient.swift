@@ -44,6 +44,7 @@ final class InstagramDataClient: ObservableObject {
     @Published private(set) var pendingSends: [String:SendAttempt] = [:]
     @Published private(set) var sendingThreads: Set<String> = []
     @Published private(set) var diagnostic = "No request made."
+    @Published private(set) var lastSendDiagnostic: String?
     private let transport: any InstagramTransport
     private let defaults: UserDefaults
     private let now: () -> Date
@@ -72,7 +73,10 @@ final class InstagramDataClient: ObservableObject {
         let result: InstagramDataResult
         do { result = try await transport.execute(operation, identifier: identifier, text: text, context: context) }
         catch {
-            if epoch == generation { diagnostic = "View: \(operation)\nHTTP: none\nResult: \(Self.code(error))" }
+            if epoch == generation {
+                diagnostic = "View: \(operation)\nHTTP: none\nResult: \(Self.code(error))"
+                if operation == "sendText" { lastSendDiagnostic = diagnostic }
+            }
             throw error
         }
         guard epoch == generation else { throw CancellationError() }
@@ -80,7 +84,12 @@ final class InstagramDataClient: ObservableObject {
         if result.error == "rateLimited" { retryAfter = now().addingTimeInterval(Double(max(60, min(result.retryAfterSeconds ?? 60, 86400)))) }
         let http = result.diagnostic["http"].flatMap(Int.init).map(String.init) ?? "none"
         let code = Self.knownError(result.error) ?? "none"
-        diagnostic = "View: \(operation)\nHTTP: \(http)\nResult: \(code)"
+        let safeReasons = ["login_required", "challenge_required", "checkpoint_required", "two_factor_required",
+                           "feedback_required", "sentry_block", "rate_limit_error", "unclassified", "invalid_response",
+                           "missing_receipt", "receipt_mismatch"]
+        let reason = result.diagnostic["reason"].flatMap { safeReasons.contains($0) ? $0 : nil } ?? "none"
+        diagnostic = "View: \(operation)\nHTTP: \(http)\nResult: \(code)\nReason: \(reason)"
+        if operation == "sendText" { lastSendDiagnostic = diagnostic }
         if operation == "inbox", result.error == nil { acceptedThreads = Set(result.threads.map(\.id)) }
         if operation == "moreInbox", result.error == nil { acceptedThreads.formUnion(result.threads.map(\.id)) }
         if (operation == "thread" || operation == "olderMessages"), result.error == nil, let attempt = pendingSends[identifier],
@@ -154,14 +163,14 @@ final class InstagramDataClient: ObservableObject {
                 return nil
             }
             let failure = Self.knownError(result.error) ?? "sendUnconfirmed"
-            if ["signIn","rateLimited","invalidMessage","sendRejected"].contains(failure) { resolveSend(thread) }
+            if ["signIn","rateLimited","actionBlocked","invalidMessage","sendRejected"].contains(failure) { resolveSend(thread) }
             return failure
         } catch { return "sendUnconfirmed" }
     }
     func keepDraft(_ text: String, for thread: String) { drafts[thread] = text.isEmpty ? nil : String(text.prefix(4000)) }
     func resolveSend(_ thread: String) { pendingSends[thread] = nil; saveJournal() }
     private func saveJournal() { defaults.set(try? JSONEncoder().encode(pendingSends), forKey: journalKey) }
-    func clearJournal() { pendingSends = [:]; defaults.removeObject(forKey: journalKey) }
+    func clearJournal() { pendingSends = [:]; lastSendDiagnostic = nil; defaults.removeObject(forKey: journalKey) }
     func close() {
         generation += 1; transport.close()
         posts = []; stories = []; threads = []; drafts = [:]; hasMore = false; moreLoading = false; moreError = nil
@@ -170,7 +179,7 @@ final class InstagramDataClient: ObservableObject {
     }
     static func knownError(_ value: String?) -> String? {
         guard let value else { return nil }
-        return ["offline","timedOut","signIn","rateLimited","unsupported","unavailable","invalidMessage","sendRejected","sendUnconfirmed"].contains(value) ? value : "unavailable"
+        return ["offline","timedOut","signIn","rateLimited","actionBlocked","unsupported","unavailable","invalidMessage","sendRejected","sendUnconfirmed"].contains(value) ? value : "unavailable"
     }
     static func code(_ error: Error) -> String {
         if case ClientError.rateLimited = error { return "rateLimited" }

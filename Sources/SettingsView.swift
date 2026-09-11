@@ -14,7 +14,8 @@ struct SettingsView: View {
     private var diagnosticReport: String {
         let version = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "?"
         let build = Bundle.main.object(forInfoDictionaryKey:"CFBundleVersion") as? String ?? "?"
-        return "Porch \(version) (\(build))\niOS \(UIDevice.current.systemVersion)\n\(client.diagnostic)"
+        let send = client.lastSendDiagnostic.map { "\n\nLast send\n\($0)" } ?? ""
+        return "Porch \(version) (\(build))\niOS \(UIDevice.current.systemVersion)\n\(client.diagnostic)\(send)"
     }
     var body: some View {
         VStack(spacing: 0) {
