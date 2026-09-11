@@ -72,7 +72,8 @@ final class UATFlowsTests: XCTestCase {
         app.buttons["settings"].tap()
         app.buttons["settings-diagnostics"].tap()
         XCTAssertTrue(app.staticTexts["diagnostics-last-failure"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.staticTexts["diagnostics-last-failure"].label.contains("actionBlocked"))
+        let retainedFailure = app.staticTexts["diagnostics-last-failure"].label
+        XCTAssertTrue(retainedFailure.contains("actionBlocked"),"Observed diagnostic summary: \(retainedFailure)")
         XCTAssertTrue(app.staticTexts["diagnostics-count"].exists)
         let attachment = XCTAttachment(screenshot:XCUIScreen.main.screenshot())
         attachment.name = "Fictional durable diagnostics"; attachment.lifetime = .keepAlways; add(attachment)

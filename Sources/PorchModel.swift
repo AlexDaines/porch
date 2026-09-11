@@ -10,5 +10,10 @@ final class PorchModel: ObservableObject {
 
     init() {
         if ProcessInfo.processInfo.arguments.contains("--sample") { mode = .sample }
+        #if DEBUG
+        // Enter native test journeys before SwiftUI can mount the welcome page
+        // and start its unrelated WebKit saved-session probe.
+        if ProcessInfo.processInfo.arguments.contains("--native") { mode = .instagram }
+        #endif
     }
 }

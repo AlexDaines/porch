@@ -17,39 +17,53 @@ final class WebKitWireTests: XCTestCase {
         var agents: [String] = []
         for local in [true, false] {
             let harness = WireWebView()
-            try await harness.prepare(origin: origin, local: local)
-            let inbox = try await harness.request("inbox", local: local)
-            XCTAssertNil(inbox.error)
-            _ = try await harness.request("thread", local: local, identifier: "21")
-            let sent = try await harness.request("sendText", local: local, identifier: "21", message: "Synthetic fixture only")
-            XCTAssertNil(sent.error)
-            XCTAssertEqual(sent.sentItemID, "fixture-receipt")
-            let requests = server.takeRequests().filter { $0.path.hasPrefix("/api/") }
-            XCTAssertEqual(requests.count, 3)
-            let post = try XCTUnwrap(requests.last)
-            XCTAssertEqual(post.method, "POST")
-            XCTAssertEqual(post.headers["origin"], origin.absoluteString)
-            XCTAssertTrue(post.headers["cookie"]?.contains("sessionid=fixture-session") == true)
-            XCTAssertEqual(post.headers["x-csrftoken"], "fixture-csrf")
-            XCTAssertEqual(post.headers["x-ig-www-claim"], "fixture-claim")
-            XCTAssertEqual(post.headers["x-ig-app-id"], "936619743392459")
-            XCTAssertFalse(post.body.contains(String(repeating: "a", count: 64)))
-            agents.append(try XCTUnwrap(post.headers["user-agent"]))
-            evidence.append([
-                "mode": local ? "local_client_world" : "loaded_page_world",
-                "post_origin_matches": String(post.headers["origin"] == origin.absoluteString),
-                "referrer_path": post.headers["referer"].flatMap(URL.init(string:))?.path ?? "missing",
-                "session_cookie_sent": String(post.headers["cookie"]?.contains("sessionid=fixture-session") == true),
-                "sec_fetch_site": post.headers["sec-fetch-site"] ?? "missing",
-                "sec_fetch_mode": post.headers["sec-fetch-mode"] ?? "missing",
-                "sec_fetch_dest": post.headers["sec-fetch-dest"] ?? "missing",
-                "ua_is_webkit": String(agents.last?.contains("AppleWebKit") == true),
-                "ua_has_safari_version": String(agents.last?.contains("Version/") == true),
-                "document_origin": inbox.diagnostic["document_origin"] ?? "missing",
-                "location_origin": inbox.diagnostic["location_origin"] ?? "missing",
-                "requests": String(requests.count)
-            ])
-            harness.close()
+            defer { harness.close() }
+            var stage = "prepare"
+            do {
+                try await harness.prepare(origin: origin, local: local)
+                stage = "inbox"
+                let inbox = try await harness.request("inbox", local: local)
+                XCTAssertNil(inbox.error)
+                stage = "thread"
+                _ = try await harness.request("thread", local: local, identifier: "21")
+                stage = "sendText"
+                let sent = try await harness.request("sendText", local: local, identifier: "21", message: "Synthetic fixture only")
+                XCTAssertNil(sent.error)
+                XCTAssertEqual(sent.sentItemID, "fixture-receipt")
+                stage = "validate_wire"
+                let requests = server.takeRequests().filter { $0.path.hasPrefix("/api/") }
+                XCTAssertEqual(requests.count, 3)
+                let post = try XCTUnwrap(requests.last)
+                XCTAssertEqual(post.method, "POST")
+                XCTAssertEqual(post.headers["origin"], origin.absoluteString)
+                XCTAssertTrue(post.headers["cookie"]?.contains("sessionid=fixture-session") == true)
+                XCTAssertEqual(post.headers["x-csrftoken"], "fixture-csrf")
+                XCTAssertEqual(post.headers["x-ig-www-claim"], "fixture-claim")
+                XCTAssertEqual(post.headers["x-ig-app-id"], "936619743392459")
+                XCTAssertFalse(post.body.contains(String(repeating: "a", count: 64)))
+                agents.append(try XCTUnwrap(post.headers["user-agent"]))
+                evidence.append([
+                    "mode": local ? "local_client_world" : "loaded_page_world",
+                    "post_origin_matches": String(post.headers["origin"] == origin.absoluteString),
+                    "referrer_path": post.headers["referer"].flatMap(URL.init(string:))?.path ?? "missing",
+                    "session_cookie_sent": String(post.headers["cookie"]?.contains("sessionid=fixture-session") == true),
+                    "sec_fetch_site": post.headers["sec-fetch-site"] ?? "missing",
+                    "sec_fetch_mode": post.headers["sec-fetch-mode"] ?? "missing",
+                    "sec_fetch_dest": post.headers["sec-fetch-dest"] ?? "missing",
+                    "ua_is_webkit": String(agents.last?.contains("AppleWebKit") == true),
+                    "ua_has_safari_version": String(agents.last?.contains("Version/") == true),
+                    "document_origin": inbox.diagnostic["document_origin"] ?? "missing",
+                    "location_origin": inbox.diagnostic["location_origin"] ?? "missing",
+                    "requests": String(requests.count)
+                ])
+            } catch {
+                XCTFail("Loopback \(local ? "local_client_world" : "loaded_page_world") failed during \(stage); navigation \(harness.stage)")
+                let context = ["mode": local ? "local_client_world" : "loaded_page_world", "stage": stage,
+                    "navigation": harness.stage, "captured_requests": String(server.takeRequests().count)]
+                let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: context, options: [.sortedKeys]), uniformTypeIdentifier: "public.json")
+                attachment.name = "loopback-failure-context.json"; attachment.lifetime = .keepAlways; add(attachment)
+                throw error
+            }
         }
         XCTAssertEqual(agents[0], agents[1], "Document loading must not change the default WebKit identity")
         let attachment = XCTAttachment(data: try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys]), uniformTypeIdentifier: "public.json")
@@ -64,6 +78,7 @@ private final class WireWebView: NSObject, WKNavigationDelegate {
     private var view: WKWebView!
     private var navigation: CheckedContinuation<Void, Error>?
     private var watchdog: Task<Void, Never>?
+    private(set) var stage = "idle"
     func prepare(origin: URL, local: Bool) async throws {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
@@ -75,10 +90,13 @@ private final class WireWebView: NSObject, WKNavigationDelegate {
         // A server sets the same disposable cookies for both variants, as a
         // sign-in page would. HTTPCookieStore writes to an IP cookie domain are
         // not a faithful way to establish this loopback browser session.
+        stage = "bootstrap_page"
         try await navigate { view.load(URLRequest(url: origin.appendingPathComponent("page"))) }
         if local {
+            stage = "local_document"
             try await navigate { view.loadHTMLString("<!doctype html><html><body></body></html>", baseURL: origin.appendingPathComponent("")) }
         }
+        stage = "ready"
     }
     private func navigate(_ load: () -> WKNavigation?) async throws {
         try await withCheckedThrowingContinuation { continuation in
@@ -105,6 +123,7 @@ private final class WireWebView: NSObject, WKNavigationDelegate {
         navigation = nil
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { finish() }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { finish(error) }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { finish(error) }
 }
 
