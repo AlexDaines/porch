@@ -1,6 +1,6 @@
 # Verification
 
-September 11, 2026. Porch **0.2 (9)** is built locally; **0.2 (7)** was read back from the operator's phone. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
+September 11, 2026. Porch **0.2 (9)** is built locally and installed on the operator's phone; the exact bundle/build was read back after installation and launch succeeded. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
 
 ## Durable diagnostics
 
@@ -12,7 +12,7 @@ The final Release compilation also verifies that fixture switches are excluded w
 
 ## DM failure investigation
 
-The operator reported signing in and receiving a DM rejection. The exact live HTTP response remains uncollected. Build 7 discarded HTTP 400 response bodies before looking for authentication challenges or rate limits. A synthetic before/after check reproduced all three known categories—challenge, rate limit and explicit restriction—being mislabeled as a generic send rejection. Build 8 reads the envelope first, shows the corresponding recovery state, and retains a fixed-category send diagnostic across later conversation reads. It does not retain server text, challenge URLs, message bodies or account identifiers in diagnostics.
+The operator supplied a build 7 diagnostic from iOS 26.6.2: `View: sendText`, `HTTP: 400`, `Result: sendRejected`. This establishes the response status but not Instagram's underlying reason, because build 7 discarded the error envelope. Build 7 discarded HTTP 400 response bodies before looking for authentication challenges or rate limits. A synthetic before/after check reproduced all three known categories—challenge, rate limit and explicit restriction—being mislabeled as a generic send rejection. Build 8 reads the envelope first, shows the corresponding recovery state, and retains a fixed-category send diagnostic across later conversation reads. It does not retain server text, challenge URLs, message bodies or account identifiers in diagnostics.
 
 Build 8’s offline suite passed **31 test definitions / 47 expanded cases**, with zero failures: `artifacts/private/dm-error-final.xcresult`. New cases cover HTTP 400/403 recovery categories, unknown responses, missing receipts, diagnostic redaction, retained drafts and the distinction between a definite refusal and an uncertain send. The [fictional blocked composer](docs/images/blocked-send.png) was visually inspected. No automated live send was attempted. This patch repairs error handling; it does not establish the cause of the operator's failure or prove live delivery.
 
@@ -46,7 +46,9 @@ This establishes the existing session's restoration path. It does not establish 
 
 ## Device and Release
 
-The build 7 installation log reported success followed by a locked-phone launch failure. On September 11, an exact `devicectl` bundle query independently confirmed **dev.alex.porch, version 0.2, build 7** on the paired iPhone 14 Pro Max; the private result is `artifacts/private/dm-installed-before.json`. The operator subsequently reported signing in and attempting a DM. The current phone session was retained while awaiting its diagnostic report, because its draft and diagnostic are in memory. Builds 8 and 9 have not been installed on that phone; the existing session was preserved.
+On September 11, after the operator confirmed that the unsent draft was only a disposable test, the canonical device workflow installed **dev.alex.porch, version 0.2, build 9** on the paired iPhone 14 Pro Max and launched it successfully. An independent installed-app query confirmed version/build (`artifacts/private/build9-installed-app.json`). The physical device's protected diagnostic directory contains a trace file; a read-only copy of that sanitized trace records build 9, iOS 26.6.2, 15 startup events and no errors (`artifacts/private/build9-phone-startup.jsonl`). No real message was sent or retried by automation. This verifies deployment and device logging, not live DM delivery.
+
+The code revision `75f7af1` also passed [GitHub's offline and Release checks](https://github.com/AlexDaines/porch/actions/runs/34581007069).
 
 The unsigned device Release archive succeeded at `.build-uat/Porch.xcarchive`; its version/build are 0.2/9. The previous build 8 archive is preserved at `.build-uat/Porch-0.2-8.xcarchive`. Debug fixture and authentication-bypass launch flags are absent from the Release executable, and the bundled adapter matches the verified source. The Release binary contains the durable log/export and crash-event code; its dSYM UUID matches the app binary (`83E990C8-81E1-3679-A1A2-58D726095990`). Signing/distribution remain with the operator's homegrown workflow. Earlier build 2 had four passing physical-device playback and fictional-composer checks; those are historical evidence, not acceptance of build 9.
 
