@@ -55,14 +55,17 @@ final class PorchUITests: XCTestCase {
         let app = XCUIApplication()
         continueAfterFailure = false
         app.terminate()
-        app.launchArguments = ["--sample"]
+        // Explicitly pin the normal-size starting condition after the earlier
+        // accessibility-size journey.
+        app.launchArguments = ["--sample", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
         XCTAssertTrue(app.staticTexts["SAMPLE"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].exists)
         XCTAssertFalse(app.buttons["Maya's sample story"].exists)
         capture(app, "Sample feed")
         app.buttons["tab-Stories"].tap()
-        XCTAssertFalse(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].exists)
+        XCTAssertTrue(app.buttons["Maya's sample story"].waitForExistence(timeout: 10), "The Stories destination must appear after one tab tap")
+        XCTAssertTrue(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].waitForNonExistence(timeout: 10), "Feed media must leave the Stories screen")
         capture(app, "Sample stories")
         app.buttons["Maya's sample story"].tap()
         XCTAssertTrue(app.buttons["Next story"].waitForExistence(timeout: 3))
@@ -98,8 +101,8 @@ final class PorchUITests: XCTestCase {
             XCTAssertTrue(app.buttons["tab-\(tab)"].isHittable)
         }
         app.buttons["tab-Stories"].tap()
-        XCTAssertTrue(app.buttons["Maya's sample story"].exists)
-        XCTAssertFalse(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].exists)
+        XCTAssertTrue(app.buttons["Maya's sample story"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.images["Sample landscape: a cabin and mountains reflected in a still lake"].waitForNonExistence(timeout: 10))
         XCTAssertTrue(app.buttons["settings"].isHittable)
         capture(app, "Large text stories")
     }

@@ -135,3 +135,15 @@ permission requirement, not an app-content change. The documentation also
 explicitly distinguishes the two atomic receipt-file writes from a cross-file
 transaction; neither a missing close acknowledgement nor a lone true sink
 flag can establish complete evidence.
+
+The final documentation head initially had mixed duplicate CI results: the PR
+run passed, while the push run failed the existing sample-navigation test's
+immediate image-absence assertion after tapping Stories. All 50 unit tests and
+all four messaging/diagnostics UI tests passed in the failing run. Its log is
+retained privately. The sample test now explicitly pins its normal text-size
+starting condition, waits for the Stories destination, and still requires the
+feed image to disappear after one tap. Both normal/large-text UI test methods
+passed locally afterwards. This changes staff test synchronization only; app
+source and frozen study bytes remain unchanged. The original CI log alone does
+not distinguish stale accessibility state from a missed navigation event, so no
+production UI defect is inferred from that failure.
