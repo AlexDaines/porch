@@ -120,6 +120,13 @@ counts. `fixtureClosed` records its log boundary. Malformed context/control,
 missing/corrupt storage, uncorrelated attempts, cleared diagnostics, overflow or interrupted launch
 makes completion false or leaves no usable acknowledgement. A missing acknowledgement is invalid evidence.
 
+The recorder must preserve both exact files before classifying or rejecting the
+run. Require both complete flags to be true, the sink and close run IDs to match
+the sealed run, and the close command ID to match the command just issued. A
+false or stale close receipt invalidates the run even when the sink says true;
+retain that failed evidence rather than repairing flags or discarding it. This
+is a recording-integrity failure, not a measured user-interface failure.
+
 ## Accepted writes and controls
 
 `sink.json` starts with `complete: false`. Its exact shape is:
