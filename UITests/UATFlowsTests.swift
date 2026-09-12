@@ -196,7 +196,15 @@ final class UATFlowsTests: XCTestCase {
         draft.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:10),"The composer keyboard must be ready before typing")
         app.typeText(text)
-        XCTAssertEqual(draft.value as? String,text,"The fixture draft must be entered before sending")
+        let firstValue = draft.value as? String
+        let complete = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", text), object: draft)
+        let result = XCTWaiter.wait(for: [complete], timeout: 5)
+        // Observe the result of this one input; do not repair it by typing or
+        // focusing again. Slow accessibility updates must settle before Send.
+        XCTAssertEqual(result, .completed, "The fixture draft must be entered before sending; first: \(String(describing: firstValue)), settled: \(String(describing: draft.value))")
+        if firstValue != text, result == .completed {
+            print("Composer accessibility value settled after typing: initial length \(firstValue?.count ?? 0), expected length \(text.count)")
+        }
     }
     @MainActor private func fixture(extra:[String] = []) -> XCUIApplication {
         continueAfterFailure = false

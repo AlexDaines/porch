@@ -55,7 +55,9 @@ final class BlindUIJourneyTests: XCTestCase {
         draft.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10))
         app.typeText(text)
-        XCTAssertEqual(draft.value as? String, text)
+        let complete = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", text), object: draft)
+        XCTAssertEqual(XCTWaiter.wait(for: [complete], timeout: 5), .completed,
+            "The single typing action must produce the complete draft; observed: \(String(describing: draft.value))")
     }
     @MainActor private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
