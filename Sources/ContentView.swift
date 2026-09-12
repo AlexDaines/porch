@@ -119,12 +119,13 @@ struct ContentView: View {
             if client.error == nil || client.hasLoadedCurrentTab {
                 ZStack {
                     switch model.tab {
-                    case .stories: NativeStories(people:client.stories,client:client)
-                    case .messages: NativeInbox(threads:client.threads,client:client)
+                    case .stories: NativeStories(people:client.stories,client:client).porchTrace("Stories", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
+                    case .messages: NativeInbox(threads:client.threads,client:client).porchTrace("Messages", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     case .feed:
                         NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ Task { await client.morePosts() } },
                             moreLoading:client.moreLoading,moreError:client.moreError,reachedSessionLimit:client.reachedSessionLimit,
                             refresh:{ await client.load(.feed,refresh:true) })
+                            .porchTrace("Feed", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     }
                     if client.loading && !client.hasLoadedCurrentTab { ProgressView().padding(16).background(PorchTheme.canvas) }
                 }

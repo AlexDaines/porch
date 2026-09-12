@@ -18,6 +18,10 @@ final class MediaPlayback: ObservableObject {
     init(diagnostics: DiagnosticsLog = .shared) { self.diagnostics = diagnostics }
 
     func start(_ url: URL, muted: Bool = false) {
+        #if BLIND_UI_FIXTURE
+        stop(); state = .failed
+        return
+        #else
         stop()
         state = .loading
         started = Date()
@@ -68,6 +72,7 @@ final class MediaPlayback: ObservableObject {
             guard let self, self.generation == epoch, self.state == .loading else { return }
             self.fail(URLError(.timedOut), stage: "watchdog")
         }
+        #endif
     }
     private func fail(_ error: Error?, stage: String) {
         var fields = trace

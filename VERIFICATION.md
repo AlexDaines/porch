@@ -82,3 +82,68 @@ The historical build 9 unsigned device Release archive is preserved at `.build-u
 - Obtain hands-on review of the larger, centered layout. Passing tests and screenshots do not substitute for that review.
 
 Instagram's unofficial routes and response shapes can change. This remains an experimental source release. The proposed friend journey is in [docs/UAT.md](docs/UAT.md).
+
+## Offline Blind UI integration — 2026-09-11
+
+A separate `PorchBlindUI` Debug target now uses the real native navigation and
+composer with six synthetic accepted conversations. Production networking is
+compile-disabled in that target. Ordinary Porch ignores its launch arguments;
+normal Release builds exclude the synthetic transport, identities and sink.
+See [the fixture contract](docs/BLIND-UI.md) for exact launch, correlation,
+control, close, privacy, durability and bounded-storage behavior.
+
+Local verification in the isolated `codex/blind-ui-fixture` worktree:
+
+- Initial full offline unit suite: **48 passed**, including 11 initial fixture
+  cases covering all seven control outcomes, correlation, privacy and failure
+  handling. After final close-handling changes, **24 focused tests passed**
+  (13 fixture cases plus 11 existing send/client cases).
+- Dedicated fixture UI suite: **2 passed**. Shared native composer shows the
+  normal `Sent` acknowledgement; six distractor/recipient rows are present;
+  a new run clears previous accepted messages; an uncertain send stays blocked
+  until reconciliation. All four screenshot attachments were visually inspected.
+- Existing ordinary Porch UI suite: **6 passed**, including appearance,
+  navigation, blocked/unconfirmed sends, refresh recovery and diagnostic export.
+- Normal Porch Release simulator build passed. Its executable was checked for
+  absence of the synthetic recipient, sink schema, fixture transport and
+  recorder-protocol strings. Dedicated fixture Debug build passed.
+- Actual compiled app, isolated iPhone 17 Pro/iOS 26.5 simulator: fresh sink
+  starts `complete:false`; action acknowledgement matches run/action/sequence;
+  independent close returns `complete:true`. A malformed-action run closes with
+  `complete:false`. The negative probe first caught a bug where invalid action
+  parsing prevented the separate close command from being read; that failure
+  was preserved, fixed and covered by a regression before artifact freeze.
+- Final 32-commit local timing sample: mean **0.45 ms**, maximum **0.74 ms** for
+  serialized, synchronized sink/journal commits. Positive context handshake
+  was about **319 ms** including Mac Python/simctl startup; this is not isolated
+  UI latency and is outside participant action counts.
+
+Private xcresults, screenshots, recorder receipts and the complete frozen-bundle
+manifest are under ignored `artifacts/private/`. No account data, production
+message, physical-device deployment, screenshot upload or hosted participant
+was involved. The recorder/model qualification, observed reference, full cohort
+and friction assessment are separate work in the Blind UI coordinator task.
+These regression checks do not establish blinded usability or live delivery.
+
+CI for fixture-source commit `61d17b4` also passed both offline regressions/UI
+journeys and the Release build for devices:
+[CI run 34666349072](https://github.com/AlexDaines/porch/actions/runs/34666349072).
+The later installation handoff confirmed that a read-only frozen bundle needs
+a writable, content-identical staging copy for CoreSimulator; the recorder
+verified and installed that copy on its separate simulator. This is an artifact
+permission requirement, not an app-content change. The documentation also
+explicitly distinguishes the two atomic receipt-file writes from a cross-file
+transaction; neither a missing close acknowledgement nor a lone true sink
+flag can establish complete evidence.
+
+The final documentation head initially had mixed duplicate CI results: the PR
+run passed, while the push run failed the existing sample-navigation test's
+immediate image-absence assertion after tapping Stories. All 50 unit tests and
+all four messaging/diagnostics UI tests passed in the failing run. Its log is
+retained privately. The sample test now explicitly pins its normal text-size
+starting condition, waits for the Stories destination, and still requires the
+feed image to disappear after one tap. Both normal/large-text UI test methods
+passed locally afterwards. This changes staff test synchronization only; app
+source and frozen study bytes remain unchanged. The original CI log alone does
+not distinguish stale accessibility state from a missed navigation event, so no
+production UI defect is inferred from that failure.

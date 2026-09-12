@@ -14,3 +14,6 @@ artifacts/test-pass-*/
 .build-uat/
 *.xcarchive/
 *.ipa
+
+__pycache__/
+*.pyc

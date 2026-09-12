@@ -61,3 +61,5 @@ The [UAT guide](docs/UAT.md) describes the checks and remaining acceptance gates
 Porch will remain free, with no subscription or paid features. Contributions should preserve deliberate use: no streaks, guilt counters, engagement prompts or attention auctions. The code is [MPL-2.0](LICENSE); that license permits commercial forks, so the no-subscription commitment is our project policy, not a restriction on other people. Asset licensing is recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Porch is independent of Instagram, Meta and the products that inspired it.
+
+For local blind interface trials, the separate Debug-only `PorchBlindUI` scheme uses the shared native interface with an offline synthetic write sink. See [the fixture and recorder contract](docs/BLIND-UI.md). Fixture evidence never establishes real Instagram delivery.

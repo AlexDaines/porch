@@ -43,6 +43,9 @@ extension EnvironmentValues {
 
 enum AppearancePreferences {
     static let store: UserDefaults = {
+        #if BLIND_UI_FIXTURE
+        return BlindUIRuntime.shared?.defaults ?? UserDefaults(suiteName: "porch.blind-ui.invalid")!
+        #else
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--appearance-fixture") {
             let name = "porch.appearance-fixture"
@@ -52,12 +55,17 @@ enum AppearancePreferences {
         }
         #endif
         return .standard
+        #endif
     }()
     static var bypassIntro: Bool {
+        #if BLIND_UI_FIXTURE
+        return true
+        #else
         #if DEBUG
         return ["--sample", "--native", "--sign-in"].contains { ProcessInfo.processInfo.arguments.contains($0) }
         #else
         return false
+        #endif
         #endif
     }
 }

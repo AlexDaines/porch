@@ -27,6 +27,9 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
     init(diagnostics: DiagnosticsLog = .shared) { self.diagnostics = diagnostics; super.init() }
 
     func execute(_ operation: String, identifier: String = "", text: String = "", context: String = "") async throws -> InstagramDataResult {
+        #if BLIND_UI_FIXTURE
+        throw InstagramDataClient.ClientError.unavailable
+        #else
         let previous = tail
         let epoch = generation
         let id = UUID()
@@ -100,6 +103,7 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
         tail = task
         defer { tasks[id] = nil; if tasks.isEmpty { tail = nil } }
         return try await task.value
+        #endif
     }
 
     // Cookie-jar metadata only; presence does not prove that a request sent it.

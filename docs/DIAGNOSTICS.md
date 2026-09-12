@@ -19,6 +19,7 @@ Every report includes the current app/build, iOS version and hardware family eve
 | Network | Availability, interface category, constrained/expensive status, IPv4/IPv6/DNS capability; no IPs, SSIDs or endpoints |
 | Sign-in | User entry/cancellation, local session hint, verification result, suppressed checks, navigation category, HTTP status, page failures, cookie-change event without cookie values |
 | Transport | Queue depth/delay, generation, WebKit preparation/failure/termination, document/location origin categories, browser family, cookie-jar presence, claim bootstrap/update/reset categories, request sequence/interval, stages, sizes, parse outcome, preserved-large-integer count, duration, outcome, bounded model counts |
+| Native interface | Closed view and logical loading/ready/error/sending/acknowledgement states; draft-validity transitions without text |
 | Messages | Input length, membership/context validation flags, prepared/dispatched attempt, receipt matching, rejection, uncertainty and reconciliation |
 | Media | Start/readiness/first playback/stop/failure; keyed URL reference, timing and known error domain/code with bounded underlying error codes; no per-frame event stream |
 | iOS diagnostics | MetricKit crash, hang, CPU, disk and launch diagnostics with at most 64 binary UUID/offset frames; payload time range and originating app version |
@@ -38,3 +39,5 @@ Writes run on a serial utility queue and synchronize each complete JSONL entry. 
 Storage failures cannot throw from `record` or trigger network activity. Failed writes retain at most 512 sanitized entries in memory for the current process, and the report shows `writeFailures`, `unreadableLines` and `directoryAvailable`. Export and deletion errors appear on the Diagnostics screen. A memory fallback cannot survive process termination. Clear log deletes trace segments, the fallback and the prior export; it leaves the installation key, sign-in and unresolved-send journal intact, then records the clearing event.
 
 Reports exclude credentials and content, but still contain activity times, message lengths, device/build information and stable pseudonymous correlations. Share them deliberately. Nothing here reconstructs a failure from a build that did not yet record durable diagnostics.
+
+Debug Blind UI trials can attach UUID `run_id`/`action_id` and integer `broker_sequence` through a recorder handshake. Send attempts preserve the action captured at the button across async dispatch and journal recovery. Ambient callbacks carry the currently active action as temporal association only. `viewState` describes logical UI state; screenshots remain necessary to establish visible pixels. This adds no arbitrary text fields. See [the offline fixture contract](BLIND-UI.md).

@@ -39,7 +39,7 @@ struct SettingsView: View {
                             Text("Following means accounts you follow, not necessarily people you know. Messages come from the accepted inbox; message requests are not loaded.")
                         }.font(PorchTheme.detail).foregroundStyle(PorchTheme.muted).padding(.top,12)
                     }
-                    Link("Source code",destination:URL(string:"https://github.com/AlexDaines/porch")!).frame(minHeight:44)
+                    Link("Source code",destination:URL(string:"https://github.com/AlexDaines/porch")!).frame(minHeight:44).porchExternalControl()
                     Button { showDiagnostics = true } label: { Text("Diagnostics").frame(minWidth:44,minHeight:44).contentShape(Rectangle()) }.accessibilityIdentifier("settings-diagnostics")
                     PorchRule()
                     Button("End session") { client.close(); browser.suspend(); model.mode = .welcome; dismiss() }
@@ -58,7 +58,7 @@ struct SettingsView: View {
                 }.frame(maxWidth: .infinity).padding(20).multilineTextAlignment(.center)
             }
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
-            .porchSheet().interactiveDismissDisabled(clearing).tint(accent)
+            .porchSheet().porchTrace("Settings").interactiveDismissDisabled(clearing).tint(accent)
             .sheet(isPresented: $showDiagnostics) { DiagnosticsView() }
     }
 }

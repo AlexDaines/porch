@@ -9,6 +9,9 @@ final class PorchModel: ObservableObject {
     @Published var showSettings = false
 
     init() {
+        #if BLIND_UI_FIXTURE
+        mode = .instagram
+        #endif
         if ProcessInfo.processInfo.arguments.contains("--sample") { mode = .sample }
         #if DEBUG
         // Enter native test journeys before SwiftUI can mount the welcome page

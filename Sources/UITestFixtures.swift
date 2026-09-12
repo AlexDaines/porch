@@ -2,6 +2,10 @@ import Foundation
 
 extension InstagramDataClient {
     @MainActor static func appClient() -> InstagramDataClient {
+        #if BLIND_UI_FIXTURE
+        guard let runtime = BlindUIRuntime.shared else { fatalError("Invalid offline fixture configuration") }
+        return runtime.makeClient()
+        #else
         #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("--uat-fixture") {
             let store = UserDefaults(suiteName:"porch.ui-fixture")!
@@ -10,6 +14,7 @@ extension InstagramDataClient {
         }
         #endif
         return InstagramDataClient()
+        #endif
     }
 }
 

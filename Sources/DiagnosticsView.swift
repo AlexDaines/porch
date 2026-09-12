@@ -45,7 +45,7 @@ struct DiagnosticsView: View {
                             snapshot = await log.snapshot(); busy = false
                         }
                     } label: { Text(busy ? "Preparing…" : "Share log").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle()) }
-                        .disabled(busy).accessibilityIdentifier("diagnostics-share")
+                        .disabled(busy).porchExternalControl().accessibilityIdentifier("diagnostics-share")
                     Button { Task { snapshot = await log.snapshot() } } label: {
                         Text("Refresh").frame(minWidth: 44, minHeight: 44).contentShape(Rectangle())
                     }.disabled(busy)
@@ -65,7 +65,7 @@ struct DiagnosticsView: View {
                     }
                 }.font(PorchTheme.body).frame(maxWidth: .infinity).padding(24).multilineTextAlignment(.center)
             }
-        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet()
+        }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).porchSheet().porchTrace("Diagnostics")
             .task { snapshot = await log.snapshot() }
             .sheet(item: $exported) { LogShareSheet(url: $0.url) }
     }

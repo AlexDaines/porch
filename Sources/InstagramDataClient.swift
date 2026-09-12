@@ -23,7 +23,7 @@ struct InstagramDataResult: Decodable {
 
 // The journal contains identifiers only, never message bodies or credentials. It survives
 // an app exit between request dispatch and acknowledgement, when resending could duplicate a DM.
-struct SendAttempt: Codable, Equatable { let context: String; let started: Date; var traceID: String? = nil }
+struct SendAttempt: Codable, Equatable { let context: String; let started: Date; var traceID: String? = nil; var action: DiagnosticAction? = nil }
 
 @MainActor
 final class InstagramDataClient: ObservableObject {
@@ -156,8 +156,10 @@ final class InstagramDataClient: ObservableObject {
             inboxHasMore = result.hasMore && threads.count < 200
         } catch { if epoch == generation { inboxMoreError = Self.code(error) } }
     }
-    func sendText(_ text: String, to thread: String) async -> String? {
+    func captureAction() -> DiagnosticAction? { diagnostics.actionContext }
+    func sendText(_ text: String, to thread: String, action: DiagnosticAction? = nil) async -> String? {
         var fields = sendFields(thread, pendingSends[thread]); fields["message_utf16"] = String(text.utf16.count)
+        fields.merge(action?.fields ?? [:]) { _, explicit in explicit }
         let invalid = !acceptedThreads.contains(thread) ? "invalid_recipient" : text.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty ? "empty_message" : text.utf16.count > 1000 ? "message_too_long" : nil
         if let invalid { fields["reason"] = invalid; diagnostics.record(.sendBlocked,fields); return "invalidMessage" }
         guard pendingSends[thread] == nil, !sendingThreads.contains(thread) else {
@@ -165,7 +167,10 @@ final class InstagramDataClient: ObservableObject {
             diagnostics.record(.sendBlocked,fields); return "sendUnconfirmed"
         }
         guard now() >= retryAfter else { fields["reason"] = "cooldown"; diagnostics.record(.sendBlocked,fields); return "rateLimited" }
-        let attempt = SendAttempt(context: String(UInt64.random(in: 1_000_000_000_000_000_000...9_000_000_000_000_000_000)), started: now(), traceID: UUID().uuidString)
+        let attempt = SendAttempt(context: String(UInt64.random(in: 1_000_000_000_000_000_000...9_000_000_000_000_000_000)), started: now(), traceID: UUID().uuidString, action: action ?? diagnostics.actionContext)
+        #if DEBUG
+        (transport as? BlindUITransport)?.associate(attempt)
+        #endif
         pendingSends[thread] = attempt; saveJournal()
         sendingThreads.insert(thread)
         fields = sendFields(thread, attempt); fields["message_utf16"] = String(text.utf16.count)
@@ -201,6 +206,7 @@ final class InstagramDataClient: ObservableObject {
         if let attempt {
             fields["context_ref"] = diagnostics.reference("context:"+attempt.context)
             if let trace = attempt.traceID { fields["attempt_id"] = trace }
+            fields.merge(attempt.action?.fields ?? [:]) { _, explicit in explicit }
         }
         return fields
     }
