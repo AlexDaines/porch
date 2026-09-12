@@ -108,12 +108,16 @@ struct NativeConversation: View {
     @State private var messages: [InstagramMessage] = []
     @State private var loading = false
     @State private var error: String?
-    @State private var draft = ""
     @State private var hasOlder = false
     @State private var loadingOlder = false
     @State private var sendError: String?
-    @State private var sent = false
+    @State private var sentMessageID: String?
+    @FocusState private var composerFocused: Bool
     @State private var confirmUnlock = false
+    private var draft: String { client.drafts[thread.id] ?? "" }
+    private var draftBinding: Binding<String> {
+        Binding(get: { draft }, set: { client.keepDraft($0, for: thread.id) })
+    }
     private var sending: Bool { client.sendingThreads.contains(thread.id) }
     private var unconfirmed: Bool { client.pendingSends[thread.id] != nil && !sending }
     private var validDraft: Bool { !draft.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty && draft.utf16.count <= 1000 }
@@ -132,11 +136,16 @@ struct NativeConversation: View {
                         if messages.count >= 200 { Eyebrow(text:"200 messages loaded. Reload to start again.") }
                         ForEach(messages) { message in
                             VStack(alignment:message.mine ? .trailing : .leading,spacing:4) {
-                            if !message.mine, let sender = message.sender { Text(sender).font(PorchTheme.utility).foregroundStyle(PorchTheme.muted) }
-                            Text(message.text).font(PorchTheme.body).textSelection(.enabled).padding(10)
-                                .background(message.mine ? PorchTheme.surface : .clear)
-                                .frame(maxWidth:.infinity,alignment:message.mine ? .trailing : .leading)
-                                .accessibilityLabel(message.mine ? "You: \(message.text)" : message.text)
+                                if !message.mine, let sender = message.sender { Text(sender).font(PorchTheme.utility).foregroundStyle(PorchTheme.muted) }
+                                Text(message.text).font(PorchTheme.body).textSelection(.enabled).padding(10)
+                                    .background(message.mine ? PorchTheme.surface : .clear)
+                                    .frame(maxWidth:.infinity,alignment:message.mine ? .trailing : .leading)
+                                    .accessibilityLabel(message.mine ? "You: \(message.text)" : message.text)
+                                if message.mine && message.id == sentMessageID {
+                                    Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted)
+                                        .accessibilityIdentifier("message-sent")
+                                        .porchTrace("Conversation", state: "sent", identifier: thread.id)
+                                }
                             }.id(message.id)
                         }
                         if loading { ProgressView().frame(maxWidth:.infinity).padding(20) }
@@ -150,7 +159,7 @@ struct NativeConversation: View {
                         PorchConfirmation(title: "Allow another message?",
                             message: "The previous message may have arrived. This clears the warning and draft; it does not resend anything.",
                             actionTitle: "Allow another message", confirm: {
-                                client.resolveSend(thread.id); draft = ""; sendError = nil; confirmUnlock = false
+                                client.resolveSend(thread.id); client.keepDraft("", for: thread.id); sendError = nil; confirmUnlock = false
                             }, cancel: { confirmUnlock = false })
                     } else {
                         Text(LoadFailure.message("sendUnconfirmed")).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
@@ -162,21 +171,38 @@ struct NativeConversation: View {
                     }
                 } else if let sendError {
                     Text(LoadFailure.message(sendError)).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
-                } else if sent { Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).accessibilityIdentifier("message-sent").porchTrace("Conversation", state: "sent", identifier: thread.id) }
+                }
                 HStack(alignment:.bottom,spacing:12) {
-                    TextField("Message",text:$draft,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(PorchTheme.body).lineLimit(1...4)
-                        .textFieldStyle(.plain).padding(.horizontal,10).padding(.vertical,8).frame(minHeight:44)
-                        .background(PorchTheme.surface).accessibilityIdentifier("message-draft")
+                    VStack(spacing: 0) {
+                        TextField("Message",text:draftBinding,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(PorchTheme.body).lineLimit(1...4)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .textFieldStyle(.plain).focused($composerFocused)
+                            .accessibilityLabel("Message").accessibilityIdentifier("message-draft")
+                    }.padding(.horizontal,10).padding(.vertical,8).frame(minHeight:44)
+                        .background(PorchTheme.surface)
+                        .overlay {
+                            Rectangle().strokeBorder(composerFocused ? accent : .clear, lineWidth: 1)
+                                .allowsHitTesting(false).accessibilityHidden(true)
+                        }
+                        .contentShape(Rectangle())
+                        // Include the visible padding without replacing the native
+                        // field's caret, selection, scrolling or accessibility actions.
+                        .simultaneousGesture(TapGesture().onEnded {
+                            recordComposerState("composer_focus_requested")
+                            composerFocused = true
+                        })
+                        .accessibilityElement(children: .contain).accessibilityIdentifier("message-entry-surface")
                     Button {
                         let text = draft
                         let action = client.captureAction()
-                        sent = false; sendError = nil
+                        sentMessageID = nil; sendError = nil
                         Task {
                             let failure = await client.sendText(text,to:thread.id,action:action)
                             if let failure { sendError = failure }
                             else {
-                                messages.append(InstagramMessage(id:"local-"+UUID().uuidString,text:text,mine:true))
-                                draft = ""; sent = true
+                                let message = InstagramMessage(id:"local-"+UUID().uuidString,text:text,mine:true)
+                                messages.append(message)
+                                sentMessageID = message.id
                             }
                         }
                     } label: {
@@ -187,22 +213,25 @@ struct NativeConversation: View {
                         .accessibilityLabel("Send message").accessibilityIdentifier("send-message")
                 }
                 if draft.utf16.count > 1000 { Text("Up to 1,000 characters.").font(PorchTheme.detail).foregroundStyle(PorchTheme.muted) }
-            }.padding(16)
+            }.padding(16).layoutPriority(1)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
             .porchSheet().interactiveDismissDisabled(sending)
             .porchTrace("Conversation", state: loading ? "loading" : sending ? "sending" : unconfirmed ? "unconfirmed" : (error != nil || sendError != nil) ? "error" : "ready", identifier: thread.id)
             .onChange(of: validDraft) { _, valid in
-                DiagnosticsLog.shared.record(.viewState, ["view": "Conversation", "state": valid ? "draft_valid" : "draft_invalid",
-                    "thread_ref": DiagnosticsLog.shared.reference("identifier:" + thread.id)])
+                recordComposerState(valid ? "draft_valid" : "draft_invalid")
             }
-            .onChange(of:draft) { _, value in client.keepDraft(value,for:thread.id) }
-            .task { draft = client.drafts[thread.id] ?? ""; await load() }
+            .onChange(of: composerFocused) { _, focused in recordComposerState(focused ? "composer_focused" : "composer_blurred") }
+            .task { await load() }
+    }
+    private func recordComposerState(_ state: String) {
+        DiagnosticsLog.shared.record(.viewState, ["view": "Conversation", "state": state,
+            "thread_ref": DiagnosticsLog.shared.reference("identifier:" + thread.id)])
     }
     private func load(older:Bool = false) async {
         guard !loading, !loadingOlder else { return }
         if older { loadingOlder = true } else { loading = true }
         error = nil
-        let wasUnconfirmed = unconfirmed
+        let pendingContext = unconfirmed ? client.pendingSends[thread.id]?.context : nil
         defer { loading = false; loadingOlder = false }
         do {
             let result = try await client.request(older ? "olderMessages" : "thread",identifier:thread.id)
@@ -214,7 +243,10 @@ struct NativeConversation: View {
                     messages.insert(contentsOf:additions.suffix(max(0,200-messages.count)),at:0)
                 } else { messages = result.messages }
                 hasOlder = result.hasMore
-                if wasUnconfirmed && client.pendingSends[thread.id] == nil { draft = ""; sendError = nil; sent = true }
+                if let pendingContext, client.pendingSends[thread.id] == nil {
+                    sendError = nil
+                    sentMessageID = messages.first(where: { $0.mine && $0.context == pendingContext })?.id
+                }
             }
         } catch { self.error = InstagramDataClient.code(error) }
     }

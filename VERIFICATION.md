@@ -1,5 +1,19 @@
 # Verification
 
+## September 12 — build 11 composer and draft refinement
+
+The complete offline suite passed **67 checks, zero failures or skips**, as counted by Xcode's result summary, in `artifacts/private/build11-verified.xcresult`. This includes 54 XCTest unit methods, the adapter checks, and ten native UI journeys. Both dedicated offline-fixture journeys also passed in `artifacts/private/build11-blind-fixture.xcresult`, including uncertain-send reconciliation, with the second-tap helper removed. These are synthetic regression results, not a blind participant result or live Instagram-delivery proof.
+
+The visible composer rectangle now focuses its native text field after one tap, including the padded corners. The first exploratory check reached only the field's accessibility bounds and passed; after exposing the unchanged outer surface to the test, a tap in its padding failed to open the keyboard. The final regression taps all four corners outside the native field's bounds and types through the keyboard without another field tap. It also checks a populated multiline field at the largest Dynamic Type setting. The bounded input now keeps its intrinsic line height while the transcript yields space. “Sent” appears under the matching outgoing message, and Continue is a single centered label.
+
+A delayed synthetic receipt reproduced newer draft edits being erased. The client now owns the displayed draft and a separate in-memory identity for the submitted revision. Both direct receipt and uncertain-send reconciliation clear only an unedited submitted draft. Tests cover edits while each request is pending, rewriting identical text, reopening the conversation, restored attempts, retained rejected drafts and unchanged no-retry behavior. No draft body or revision identity was added to the persistent journal.
+
+The new fixed-category focus and draft-preservation diagnostics passed export-canary tests and were independently read from the running fixture's local timeline: focus requests, focused/blurred transitions and preserved drafts were present, correlated by keyed thread reference, with no discarded fields or raw-input keys. The private check is `artifacts/private/build11-focus-logging-check.json`.
+
+Introduction, welcome, feed, separate stories, settings, accepted-send and maximum-text composer screenshots were visually inspected. Updated synthetic illustrations: [introduction](docs/images/color-introduction.png), [composer](docs/images/fictional-composer.png), and [large-text composer](docs/images/large-text-composer.png). The previous frozen study artifact and its PR branch are unchanged; this refinement is isolated on `codex/porch-refinement-build11`. Release packaging and build identities are recorded separately after this verified source is committed. No physical-phone deployment or live send is claimed for build 11 here.
+
+## Previous build 10 verification
+
 September 11, 2026. Porch **0.2 (10)** is built locally and installed on the operator's phone; its exact bundle/build was independently read back. The first build 10 launch verified the new on-device diagnostic fields. The final schema correction is installed, but automatic launch was declined while the phone required a passcode. This is an internal iteration, not a UAT-readiness claim. Xcode 26.6 / Swift 6.3.3; simulator iOS 26.5. Deployment target iOS 18; iOS 18 itself has not been tested.
 
 ## Request compatibility refinement

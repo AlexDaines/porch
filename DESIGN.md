@@ -68,3 +68,9 @@ A journal of conversation ID, request context and timestamp is written before di
 ## Evidence
 
 Synthetic WebKit fixtures establish adapter behavior. The offline UI journey establishes sample navigation. Separate opt-in signed-in checks establish actual feed/story/inbox data and native UI behavior. A fixture, sample, or login-page screenshot is never proof of live content. See [VERIFICATION.md](VERIFICATION.md).
+
+## Build 11 composer refinement
+
+The entry surface keeps its quiet square shape and shows a one-point outline in the chosen accent while focused. Tapping its padding focuses the existing native multiline field, preserving caret selection, native accessibility and the separate Send action. The field yields complete bounded lines at larger text sizes while the conversation remains scrollable. “Sent” sits directly under the acknowledged outgoing message; reconciliation attaches it to the matching message context. The client owns the current draft and a separate in-memory revision identity for the submitted snapshot. A direct receipt or later reconciliation clears only the unchanged submitted draft. Later edits survive, including a rewrite to identical text and reopening the conversation. A restored send cannot clear a new draft from the current launch. Revision identities and drafts never enter the persistent send journal. Explicitly choosing to clear the unresolved warning still clears the draft as stated in that confirmation.
+
+The color introduction now uses a single centered Continue label. Its palette, scale, square swatches and local preference behavior stay the same.

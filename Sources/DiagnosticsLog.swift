@@ -311,7 +311,7 @@ final class DiagnosticsLog: @unchecked Sendable {
         "operation": operations, "result": errors, "error_domain": errorDomains, "savedSession": ["present", "absent"],
         "phase": ["idle", "signingIn", "connected"], "mode": ["welcome", "sample", "instagram", "finished"],
         "view": ["Feed", "Stories", "Messages", "Settings", "Diagnostics", "welcome", "Conversation", "Story"],
-        "state": ["active", "inactive", "background", "foreground", "terminated", "satisfied", "unsatisfied", "requiresConnection", "nominal", "fair", "serious", "critical", "unknown", "visible", "hidden", "loading", "ready", "error", "sending", "sent", "unconfirmed", "draft_valid", "draft_invalid"],
+        "state": ["active", "inactive", "background", "foreground", "terminated", "satisfied", "unsatisfied", "requiresConnection", "nominal", "fair", "serious", "critical", "unknown", "visible", "hidden", "loading", "ready", "error", "sending", "sent", "unconfirmed", "draft_valid", "draft_invalid", "composer_focus_requested", "composer_focused", "composer_blurred", "draft_preserved"],
         "interface": ["wifi", "cellular", "wiredEthernet", "loopback", "other", "none"],
         "method": ["GET", "POST"], "origin": ["instagram_web", "instagram_mobile", "instagram_cdn", "facebook_cdn", "other"],
         "content_type": ["json", "html", "text", "other", "missing"],

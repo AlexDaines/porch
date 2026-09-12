@@ -14,12 +14,7 @@ struct ColorWelcomeView: View {
                         Text("Choose a color.").font(PorchTheme.heading)
                             .accessibilityAddTraits(.isHeader)
                         ColorChoices(selection: $selection)
-                        Button(action: continueIntoApp) {
-                            HStack(spacing: 8) {
-                                Text("Continue")
-                                Image(systemName: "arrow.right").font(PorchTheme.detail)
-                            }.contentShape(Rectangle())
-                        }.buttonStyle(PorchButtonStyle())
+                        Button("Continue", action: continueIntoApp).buttonStyle(PorchButtonStyle())
                             .accessibilityIdentifier("color-continue")
                     }
                     Spacer(minLength: 64)
