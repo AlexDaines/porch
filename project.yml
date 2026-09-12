@@ -27,6 +27,29 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: "Porch"
         INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+  PorchBlindUI:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        excludes: [Resources, Info.plist]
+      - path: Sources/Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.blindui
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+        INFOPLIST_FILE: Sources/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: "Porch"
+        INFOPLIST_KEY_UILaunchScreen_Generation: "YES"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      configs:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) DEBUG BLIND_UI_FIXTURE"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) BLIND_UI_FIXTURE"
   PorchTests:
     type: bundle.unit-test
     platform: iOS
@@ -47,6 +70,16 @@ targets:
       base:
         GENERATE_INFOPLIST_FILE: "YES"
         PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.uitests
+  PorchBlindUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [BlindUITests]
+    dependencies:
+      - target: PorchBlindUI
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: "YES"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.alex.porch.blindui.uitests
   PorchLiveTests:
     type: bundle.ui-testing
     platform: iOS
@@ -101,3 +134,13 @@ schemes:
       targets:
         - PorchAccountTests
         - PorchAccountUITests
+  PorchBlindUI:
+    build:
+      targets:
+        PorchBlindUI: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - PorchBlindUITests

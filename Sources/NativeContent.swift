@@ -136,6 +136,10 @@ struct NativePostImage: View {
     var maxHeight: CGFloat = 420
     @State private var retry = UUID()
     var body: some View {
+        #if BLIND_UI_FIXTURE
+        BlindUIPhoto().frame(maxWidth: .infinity, maxHeight: maxHeight)
+            .accessibilityLabel(media.alt ?? "Post photo").accessibilityIdentifier("native-post-image").accessibilityAddTraits(.isImage)
+        #else
         AsyncImage(url: media.imageURL) { phase in
             switch phase {
             case .success(let image):
@@ -151,6 +155,7 @@ struct NativePostImage: View {
             default: ProgressView().frame(maxWidth: .infinity, minHeight: 180)
             }
         }.id(retry).frame(maxWidth: .infinity, maxHeight: maxHeight)
+        #endif
 
     }
 }

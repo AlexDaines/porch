@@ -60,6 +60,7 @@ struct NativeStoryViewer: View {
             }
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone)
             .porchSheet()
+            .porchTrace("Story", state: loading ? "loading" : error == nil ? "ready" : "error", identifier: person.id)
             .task(id:retry) {
                 loading = true; error = nil
                 do { let result = try await client.request("story",identifier:person.id); items = result.posts; error = result.error }
@@ -161,16 +162,17 @@ struct NativeConversation: View {
                     }
                 } else if let sendError {
                     Text(LoadFailure.message(sendError)).font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
-                } else if sent { Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).accessibilityIdentifier("message-sent") }
+                } else if sent { Text("Sent").font(PorchTheme.utility).foregroundStyle(PorchTheme.muted).accessibilityIdentifier("message-sent").porchTrace("Conversation", state: "sent", identifier: thread.id) }
                 HStack(alignment:.bottom,spacing:12) {
                     TextField("Message",text:$draft,prompt:Text("Message").foregroundStyle(PorchTheme.muted),axis:.vertical).font(PorchTheme.body).lineLimit(1...4)
                         .textFieldStyle(.plain).padding(.horizontal,10).padding(.vertical,8).frame(minHeight:44)
                         .background(PorchTheme.surface).accessibilityIdentifier("message-draft")
                     Button {
                         let text = draft
+                        let action = client.captureAction()
                         sent = false; sendError = nil
                         Task {
-                            let failure = await client.sendText(text,to:thread.id)
+                            let failure = await client.sendText(text,to:thread.id,action:action)
                             if let failure { sendError = failure }
                             else {
                                 messages.append(InstagramMessage(id:"local-"+UUID().uuidString,text:text,mine:true))
@@ -188,6 +190,11 @@ struct NativeConversation: View {
             }.padding(16)
         }.background(PorchTheme.canvas).foregroundStyle(PorchTheme.bone).preferredColorScheme(.dark)
             .porchSheet().interactiveDismissDisabled(sending)
+            .porchTrace("Conversation", state: loading ? "loading" : sending ? "sending" : unconfirmed ? "unconfirmed" : (error != nil || sendError != nil) ? "error" : "ready", identifier: thread.id)
+            .onChange(of: validDraft) { _, valid in
+                DiagnosticsLog.shared.record(.viewState, ["view": "Conversation", "state": valid ? "draft_valid" : "draft_invalid",
+                    "thread_ref": DiagnosticsLog.shared.reference("identifier:" + thread.id)])
+            }
             .onChange(of:draft) { _, value in client.keepDraft(value,for:thread.id) }
             .task { draft = client.drafts[thread.id] ?? ""; await load() }
     }

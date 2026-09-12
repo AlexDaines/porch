@@ -29,6 +29,10 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
         return result?.diagnostic["savedSession"] == "present"
     }
     func connect() {
+        #if BLIND_UI_FIXTURE
+        failure = "Sign-in is unavailable in this offline study."
+        return
+        #else
         guard !clearingWebsiteData else { return }
         suspend()
         failure = nil; notice = nil
@@ -47,6 +51,7 @@ final class InstagramBrowser: NSObject, ObservableObject, InstagramAuthenticatio
         }
         beginLoading(view)
         view.load(URLRequest(url: NavigationPolicy.login, timeoutInterval: 25))
+        #endif
     }
     func suspend() {
         sessionProbe.close()

@@ -1,6 +1,18 @@
 import Foundation
 import CryptoKit
 
+struct DiagnosticAction: Codable, Equatable, Sendable {
+    let runID: String
+    var actionID: String? = nil
+    var brokerSequence: Int? = nil
+    var fields: [String: String] {
+        var fields = ["run_id": runID]
+        fields["action_id"] = actionID
+        fields["broker_sequence"] = brokerSequence.map(String.init)
+        return fields
+    }
+}
+
 // Local engineering traces, not analytics. Every disk/export field passes the same
 // closed schema. There is deliberately no API for logging an arbitrary message,
 // URL, response body, Error description, cookie, username or conversation text.
@@ -17,6 +29,7 @@ final class DiagnosticsLog: @unchecked Sendable {
         case mediaStart, mediaReady, mediaPlaying, mediaFailed, mediaStopped, imageFailed
         case iosCrash, iosHang, iosCPUException, iosDiskException, iosLaunchDiagnostic
         case exportCreated, logsCleared
+        case viewState, actionApplied, fixtureClosed
     }
     struct Entry: Codable {
         let schema: Int
@@ -53,6 +66,11 @@ final class DiagnosticsLog: @unchecked Sendable {
     }
 
     static let shared: DiagnosticsLog = {
+        #if BLIND_UI_FIXTURE
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("PorchBlindUI")
+        let configuration = BlindUILaunchConfiguration.parse(ProcessInfo.processInfo.arguments, root: root)
+        return DiagnosticsLog(directory: (configuration?.directory ?? root.appendingPathComponent("invalid")).appendingPathComponent("Diagnostics"))
+        #else
         #if DEBUG
         let process = ProcessInfo.processInfo
         let fixture = process.arguments.contains("--uat-fixture") || process.arguments.contains("--sample") ||
@@ -63,6 +81,7 @@ final class DiagnosticsLog: @unchecked Sendable {
         #endif
         let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return DiagnosticsLog(directory: root.appendingPathComponent(name))
+        #endif
     }()
 
     private let directory: URL
@@ -77,6 +96,10 @@ final class DiagnosticsLog: @unchecked Sendable {
     private var writeFailures = 0
     private var recent: [Entry] = []
     private var directoryAvailable = false
+    private let actionLock = NSLock()
+    private var currentAction: DiagnosticAction?
+    var actionContext: DiagnosticAction? { actionLock.withLock { currentAction } }
+    func setActionContext(_ action: DiagnosticAction?) { actionLock.withLock { currentAction = action } }
 
     init(directory: URL, configuration: Configuration = .init(), now: @escaping @Sendable () -> Date = { Date() }) {
         self.directory = directory
@@ -106,7 +129,8 @@ final class DiagnosticsLog: @unchecked Sendable {
     var adapterDiagnosticKey: String { key.withUnsafeBytes { Data($0).map { String(format: "%02x", $0) }.joined() } }
 
     func record(_ event: Event, _ fields: [String: String] = [:]) {
-        let safe = Self.sanitize(fields)
+        let contextual = (actionContext?.fields ?? [:]).merging(fields) { _, explicit in explicit }
+        let safe = Self.sanitize(contextual)
         let date = now()
         let uptime = ProcessInfo.processInfo.systemUptime
         queue.async { [self] in
@@ -281,13 +305,13 @@ final class DiagnosticsLog: @unchecked Sendable {
     static let operations: Set<String> = ["sessionHint", "session", "feed", "moreFeed", "stories", "story", "inbox", "moreInbox", "thread", "olderMessages", "sendText"]
     static let errors: Set<String> = ["none", "offline", "timedOut", "signIn", "rateLimited", "actionBlocked", "unsupported", "unavailable", "invalidMessage", "sendRejected", "sendUnconfirmed", "cancelled"]
     static let maximumFields = 96
-    private static let numbers: Set<String> = ["adapter_revision", "transport_request_index", "since_previous_fetch_ms", "large_integer_count", "retry_after_seconds", "cookie_count", "http", "duration_ms", "queue_ms", "fetch_ms", "decode_ms", "prepare_ms", "bridge_ms", "response_bytes", "response_chars", "request_bytes", "queue_depth", "generation", "posts", "stories", "threads", "messages", "raw_count", "filtered_count", "message_utf16", "pending_count", "cursor_length", "error_code", "exception_type", "exception_code", "signal", "frame_count", "duration_seconds", "memory_bytes", "schema_unknown_keys", "discarded_field_count", "payload_count", "period_start", "period_end", "js_line", "js_column"]
+    private static let numbers: Set<String> = ["broker_sequence", "adapter_revision", "transport_request_index", "since_previous_fetch_ms", "large_integer_count", "retry_after_seconds", "cookie_count", "http", "duration_ms", "queue_ms", "fetch_ms", "decode_ms", "prepare_ms", "bridge_ms", "response_bytes", "response_chars", "request_bytes", "queue_depth", "generation", "posts", "stories", "threads", "messages", "raw_count", "filtered_count", "message_utf16", "pending_count", "cursor_length", "error_code", "exception_type", "exception_code", "signal", "frame_count", "duration_seconds", "memory_bytes", "schema_unknown_keys", "discarded_field_count", "payload_count", "period_start", "period_end", "js_line", "js_column"]
     private static let booleans: Set<String> = ["secure_context", "ua_mobile", "ua_safari", "account_changed", "challenge_present", "two_factor_present", "feedback_present", "spam_flag", "session_cookie_present", "csrf_cookie_present", "viewer_cookie_present", "device_cookie_present", "machine_cookie_present", "automatic", "saved_session", "has_more", "refresh", "csrf_present", "viewer_present", "context_valid", "thread_allowed", "thread_opened", "receipt_present", "receipt_thread_matches", "receipt_context_matches", "low_power", "expensive", "constrained", "ipv4", "ipv6", "dns", "simulator", "muted", "frames_truncated"]
     private static let enums: [String: Set<String>] = [
         "operation": operations, "result": errors, "error_domain": errorDomains, "savedSession": ["present", "absent"],
         "phase": ["idle", "signingIn", "connected"], "mode": ["welcome", "sample", "instagram", "finished"],
-        "view": ["Feed", "Stories", "Messages", "Settings", "Diagnostics", "welcome"],
-        "state": ["active", "inactive", "background", "foreground", "terminated", "satisfied", "unsatisfied", "requiresConnection", "nominal", "fair", "serious", "critical", "unknown"],
+        "view": ["Feed", "Stories", "Messages", "Settings", "Diagnostics", "welcome", "Conversation", "Story"],
+        "state": ["active", "inactive", "background", "foreground", "terminated", "satisfied", "unsatisfied", "requiresConnection", "nominal", "fair", "serious", "critical", "unknown", "visible", "hidden", "loading", "ready", "error", "sending", "sent", "unconfirmed", "draft_valid", "draft_invalid"],
         "interface": ["wifi", "cellular", "wiredEthernet", "loopback", "other", "none"],
         "method": ["GET", "POST"], "origin": ["instagram_web", "instagram_mobile", "instagram_cdn", "facebook_cdn", "other"],
         "content_type": ["json", "html", "text", "other", "missing"],
@@ -315,7 +339,7 @@ final class DiagnosticsLog: @unchecked Sendable {
                 result[field] = value
             } else if booleans.contains(field), ["true", "false"].contains(value) { result[field] = value
             } else if let values = enums[field], values.contains(value) { result[field] = value
-            } else if ["request_id", "transport_id", "attempt_id"].contains(field), UUID(uuidString: value) != nil { result[field] = value
+            } else if ["request_id", "transport_id", "attempt_id", "run_id", "action_id"].contains(field), UUID(uuidString: value) != nil { result[field] = value
             } else if ["thread_ref", "context_ref", "media_ref", "server_fingerprint"].contains(field), value.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil { result[field] = value
             } else if ["app_version", "build", "os_version"].contains(field), value.range(of: "^[0-9.]{1,24}$", options: .regularExpression) != nil { result[field] = value
             } else if field == "hardware", value.range(of: "^(iPhone|iPad)[0-9]{1,3},[0-9]{1,3}$|^simulator$", options: .regularExpression) != nil { result[field] = value
