@@ -124,3 +124,14 @@ message, physical-device deployment, screenshot upload or hosted participant
 was involved. The recorder/model qualification, observed reference, full cohort
 and friction assessment are separate work in the Blind UI coordinator task.
 These regression checks do not establish blinded usability or live delivery.
+
+CI for fixture-source commit `61d17b4` also passed both offline regressions/UI
+journeys and the Release build for devices:
+[CI run 34666349072](https://github.com/AlexDaines/porch/actions/runs/34666349072).
+The later installation handoff confirmed that a read-only frozen bundle needs
+a writable, content-identical staging copy for CoreSimulator; the recorder
+verified and installed that copy on its separate simulator. This is an artifact
+permission requirement, not an app-content change. The documentation also
+explicitly distinguishes the two atomic receipt-file writes from a cross-file
+transaction; neither a missing close acknowledgement nor a lone true sink
+flag can establish complete evidence.

@@ -37,6 +37,16 @@ The build number remains the underlying Porch version; always identify this
 artifact by bundle ID plus a digest of **all** app-bundle files, not the version
 number or executable alone. Xcode Debug uses a separate `.debug.dylib`.
 
+If the recorder freezes that bundle by removing write permissions, create a
+separate installation copy before using `simctl install`. CoreSimulator can
+fail with EACCES while staging a read-only `.app`. Restore directories to `0755`,
+ordinary files to `0644`, and the main executable, `.debug.dylib`, and
+`__preview.dylib` to their original `0755` mode. Keep the copy's enclosing evidence
+directory at `0700`. Verify every file's bytes against the sealed manifest before
+installation and against the installed bundle afterwards. Retain the untouched
+frozen source. A content digest does not include permissions unless its manifest
+explicitly says so.
+
 ## Launch and reset
 
 Build with XcodeGen and the existing iOS workflow:
@@ -108,7 +118,7 @@ settle, flushes and checks diagnostics, and atomically persists the sink and
 **and** `sink.complete == true`. Close is staff work outside participant action
 counts. `fixtureClosed` records its log boundary. Malformed context/control,
 missing/corrupt storage, uncorrelated attempts, cleared diagnostics, overflow or interrupted launch
-makes completion false. A missing acknowledgement is invalid evidence.
+makes completion false or leaves no usable acknowledgement. A missing acknowledgement is invalid evidence.
 
 ## Accepted writes and controls
 
@@ -147,7 +157,11 @@ observable in the ordinary fixture without fault injection.
 
 Sink/journal commits serialize and synchronize before returning acceptance.
 Atomic replacement plus file and parent-directory fsync precedes a successful
-close. A crash before recorder close leaves incomplete evidence. Relaunch
+close. These are two separately atomic files, not one atomic transaction: an
+IO failure after the sink write may leave `sink.complete == true` on disk with
+no matching close receipt. That is invalid evidence. Always require both files
+and their matching identities, even if the app's in-memory failure flag is no
+longer available. A crash before recorder close leaves incomplete evidence. Relaunch
 preserves available state but never declares that an interrupted study was
 lossless. UI acknowledgement is unaffected by evidence IO failure: the study
 becomes invalid while the app remains usable.
