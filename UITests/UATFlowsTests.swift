@@ -1,6 +1,115 @@
 import XCTest
 
 final class UATFlowsTests: XCTestCase {
+    @MainActor func testReconciliationPreservesEditsMadeWhileChecking() {
+        let app = fixture(extra: ["--uat-unconfirmed", "--uat-delayed-reconcile"])
+        app.buttons["tab-Messages"].tap()
+        let row = app.buttons.containing(.staticText, identifier: "UAT fixture").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        let draft = app.descendants(matching: .any).matching(identifier: "message-draft").firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        enterDraft("Submitted snapshot", in: draft, app: app)
+        app.buttons["send-message"].tap()
+        let check = app.buttons["Check conversation"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5)); check.tap()
+        XCTAssertFalse(check.isEnabled)
+        app.typeText(" plus a newer draft")
+        XCTAssertEqual(draft.value as? String, "Submitted snapshot plus a newer draft")
+        XCTAssertTrue(app.staticTexts["message-sent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["You: Submitted snapshot"].exists)
+        XCTAssertEqual(draft.value as? String, "Submitted snapshot plus a newer draft")
+        XCTAssertFalse(check.exists)
+        XCTAssertTrue(app.buttons["send-message"].isEnabled)
+        app.buttons["Close conversation"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertEqual(draft.value as? String, "Submitted snapshot plus a newer draft")
+    }
+
+    @MainActor func testReceiptPreservesEditsMadeWhileSending() {
+        let app = fixture(extra: ["--uat-delayed-send"])
+        app.buttons["tab-Messages"].tap()
+        let row = app.buttons.containing(.staticText, identifier: "UAT fixture").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        let draft = app.descendants(matching: .any).matching(identifier: "message-draft").firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        enterDraft("First message", in: draft, app: app)
+        app.buttons["send-message"].tap()
+        XCTAssertFalse(app.buttons["send-message"].isEnabled)
+        app.typeText(" plus an edit")
+        XCTAssertEqual(draft.value as? String, "First message plus an edit")
+        XCTAssertTrue(app.staticTexts["message-sent"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["You: First message"].exists)
+        XCTAssertEqual(draft.value as? String, "First message plus an edit", "The receipt must not erase a newer edit")
+        app.buttons["Close conversation"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertEqual(draft.value as? String, "First message plus an edit", "The newer draft must survive reopening")
+    }
+
+    @MainActor func testComposerPaddingFocusesAndAcceptsTypingAfterOneTap() {
+        let app = fixture(extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"])
+        app.buttons["tab-Messages"].tap()
+        let row = app.buttons.containing(.staticText, identifier: "UAT fixture").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        var expected = ""
+        for corner in [CGVector(dx: 0, dy: 0), CGVector(dx: 1, dy: 0),
+                       CGVector(dx: 0, dy: 1), CGVector(dx: 1, dy: 1)] {
+            row.tap()
+            let draft = app.descendants(matching: .any).matching(identifier: "message-draft").firstMatch
+            XCTAssertTrue(draft.waitForExistence(timeout: 5))
+            let surface = app.otherElements["message-entry-surface"]
+            XCTAssertTrue(surface.exists)
+            XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+            let inset = CGVector(dx: corner.dx == 0 ? 2 : -2, dy: corner.dy == 0 ? 2 : -2)
+            let tap = surface.coordinate(withNormalizedOffset: corner).withOffset(inset)
+            XCTAssertFalse(draft.frame.contains(tap.screenPoint), "Exercise the visible padding, outside the native field's bounds")
+            tap.tap()
+            XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5), "One tap inside the visible corner must focus the composer")
+            // Type through the keyboard; do not tap/focus the field again or let
+            // a field-targeted typing helper repair a missed first tap.
+            app.typeText("x")
+            expected += "x"
+            XCTAssertEqual(draft.value as? String, expected)
+            XCTAssertTrue(app.buttons["send-message"].isEnabled)
+            XCTAssertFalse(app.staticTexts["message-sent"].exists, "Focusing must never send")
+            app.buttons["Close conversation"].tap()
+            XCTAssertTrue(row.waitForExistence(timeout: 5))
+        }
+    }
+
+    @MainActor func testMultilineComposerPaddingAtLargestTextSize() {
+        let app = fixture(extra: ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        app.buttons["tab-Messages"].tap()
+        let row = app.buttons.containing(.staticText, identifier: "UAT fixture").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        let draft = app.descendants(matching: .any).matching(identifier: "message-draft").firstMatch
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertEqual(draft.label, "Message", "The composer remains a named native text input")
+        let surface = app.otherElements["message-entry-surface"]
+        surface.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 2, dy: 2)).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let text = "One line\nAnother line\nRoom to write."
+        app.typeText(text)
+        XCTAssertEqual(draft.value as? String, text)
+        XCTAssertTrue(app.buttons["send-message"].isHittable)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "Large text multiline composer"; attachment.lifetime = .keepAlways; add(attachment)
+        app.buttons["Close conversation"].tap()
+        XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        let corner = surface.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(CGVector(dx: -2, dy: -2))
+        XCTAssertFalse(draft.frame.contains(corner.screenPoint))
+        corner.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.typeText("!")
+        let edited = draft.value as? String ?? ""
+        XCTAssertEqual(edited.count, text.count + 1)
+        XCTAssertEqual(edited.replacingOccurrences(of: "!", with: ""), text)
+        XCTAssertFalse(app.staticTexts["message-sent"].exists)
+    }
+
     @MainActor func testComposerAndRefreshRecoveryUseFictionalTransport() {
         let app = fixture()
         XCTAssertTrue(app.staticTexts["uat.fixture"].waitForExistence(timeout:10))
@@ -40,6 +149,7 @@ final class UATFlowsTests: XCTestCase {
         XCTAssertEqual(draft.value as? String,"Only one copy","Cancelling must preserve the draft")
         app.buttons["Check conversation"].tap()
         XCTAssertTrue(app.buttons["Check conversation"].waitForNonExistence(timeout:5))
+        XCTAssertTrue(app.staticTexts["message-sent"].waitForExistence(timeout:5), "Reconciliation must label the matching outgoing message")
         XCTAssertFalse(app.buttons["send-message"].isEnabled,"Confirmed send must clear the old draft")
     }
     @MainActor func testBlockedSendKeepsDraftAndNeverShowsSent() {
@@ -85,15 +195,24 @@ final class UATFlowsTests: XCTestCase {
     @MainActor private func enterDraft(_ text:String,in draft:XCUIElement,app:XCUIApplication) {
         draft.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout:10),"The composer keyboard must be ready before typing")
-        // Keyboard presentation moves this bottom-anchored field; focus its settled position.
-        draft.tap()
-        draft.typeText(text)
-        XCTAssertEqual(draft.value as? String,text,"The fixture draft must be entered before sending")
+        app.typeText(text)
+        let firstValue = draft.value as? String
+        let complete = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", text), object: draft)
+        let result = XCTWaiter.wait(for: [complete], timeout: 5)
+        // Observe the result of this one input; do not repair it by typing or
+        // focusing again. Slow accessibility updates must settle before Send.
+        XCTAssertEqual(result, .completed, "The fixture draft must be entered before sending; first: \(String(describing: firstValue)), settled: \(String(describing: draft.value))")
+        if firstValue != text, result == .completed {
+            print("Composer accessibility value settled after typing: initial length \(firstValue?.count ?? 0), expected length \(text.count)")
+        }
     }
     @MainActor private func fixture(extra:[String] = []) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication(); app.terminate()
         app.launchArguments = ["--native","--uat-fixture"] + extra
+        if !extra.contains("-UIPreferredContentSizeCategoryName") {
+            app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
+        }
         app.launch(); return app
     }
 }

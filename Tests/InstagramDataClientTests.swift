@@ -6,6 +6,73 @@ final class InstagramDataClientTests: XCTestCase {
     private func defaults() -> UserDefaults { UserDefaults(suiteName:"porch.tests."+UUID().uuidString)! }
     private func post(_ id: String) -> InstagramPost { InstagramPost(id:id,username:"fixture",caption:"Fixture",timestamp:1,media:[]) }
 
+    func testReceiptClearsOnlyTheUneditedSubmittedDraft() async {
+        for edit in [nil, "Newer draft", "Original"] as [String?] {
+            let transport = StubTransport()
+            transport.results = [.init(threads: [.init(id: "21", title: "Fixture", preview: "")])]
+            let client = InstagramDataClient(transport: transport, defaults: defaults())
+            await client.load(.messages)
+            client.keepDraft("Original", for: "21")
+            transport.hold = true
+            let send = Task { await client.sendText("Original", to: "21") }
+            await transport.waitForPending()
+            if let edit {
+                client.keepDraft("Intermediate edit", for: "21")
+                client.keepDraft(edit, for: "21")
+            }
+            transport.resume(.init(sentItemID: "acknowledged"))
+            let result = await send.value
+            XCTAssertNil(result)
+            XCTAssertEqual(client.drafts["21"], edit)
+            XCTAssertNil(client.pendingSends["21"])
+            XCTAssertEqual(transport.calls.filter { $0 == "sendText" }.count, 1)
+        }
+    }
+
+    func testReconciliationPreservesEditsDuringReadIncludingRewrittenIdenticalText() async throws {
+        for edit in [nil, "Newer draft", "Original"] as [String?] {
+            let transport = StubTransport()
+            transport.results = [.init(threads: [.init(id: "21", title: "Fixture", preview: "")]), .init(error: "sendUnconfirmed")]
+            let client = InstagramDataClient(transport: transport, defaults: defaults())
+            await client.load(.messages)
+            client.keepDraft("Original", for: "21")
+            _ = await client.sendText("Original", to: "21")
+            let context = try XCTUnwrap(client.pendingSends["21"]?.context)
+            transport.hold = true
+            let read = Task { try await client.request("thread", identifier: "21") }
+            await transport.waitForPending()
+            if let edit {
+                client.keepDraft("Intermediate edit", for: "21")
+                client.keepDraft(edit, for: "21")
+            }
+            transport.resume(.init(messages: [.init(id: "sent", text: "Original", mine: true, context: context)]))
+            _ = try await read.value
+            XCTAssertEqual(client.drafts["21"], edit)
+            XCTAssertNil(client.pendingSends["21"])
+            XCTAssertEqual(transport.calls, ["inbox", "sendText", "thread"])
+        }
+    }
+
+    func testRestoredAttemptCannotEraseADraftFromTheNewLaunch() async throws {
+        let store = defaults(), originalTransport = StubTransport()
+        originalTransport.results = [.init(threads: [.init(id: "21", title: "Fixture", preview: "")]), .init(error: "sendUnconfirmed")]
+        let original = InstagramDataClient(transport: originalTransport, defaults: store)
+        await original.load(.messages)
+        original.keepDraft("PRIVATE_ORIGINAL", for: "21")
+        _ = await original.sendText("PRIVATE_ORIGINAL", to: "21")
+        let context = try XCTUnwrap(original.pendingSends["21"]?.context)
+        let saved = try XCTUnwrap(store.data(forKey: "porch.pending-sends.v1"))
+        XCTAssertFalse(String(decoding: saved, as: UTF8.self).contains("PRIVATE"))
+        let transport = StubTransport()
+        transport.results = [.init(messages: [.init(id: "sent", text: "PRIVATE_ORIGINAL", mine: true, context: context)])]
+        let restarted = InstagramDataClient(transport: transport, defaults: store)
+        restarted.keepDraft("PRIVATE_NEW_DRAFT", for: "21")
+        _ = try await restarted.request("thread", identifier: "21")
+        XCTAssertEqual(restarted.drafts["21"], "PRIVATE_NEW_DRAFT")
+        XCTAssertNil(restarted.pendingSends["21"])
+        XCTAssertEqual(transport.calls, ["thread"])
+    }
+
     func testSendTraceSurvivesRestartAndReconciliationWithoutContentOrRetry() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

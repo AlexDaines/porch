@@ -23,6 +23,7 @@ extension InstagramDataClient {
 @MainActor
 private final class UITestTransport: InstagramTransport {
     private var feedLoads = 0
+    private var delayedReconciliation = false
     private var messages = [InstagramMessage(id:"1",text:"A fictional conversation for UAT checks.",mine:false)]
     func execute(_ operation:String,identifier:String,text:String,context:String) async throws -> InstagramDataResult {
         try await Task.sleep(for:.milliseconds(150))
@@ -32,8 +33,16 @@ private final class UITestTransport: InstagramTransport {
             if feedLoads > 1 { return .init(error:"offline") }
             return .init(posts:[.init(id:"1",username:"uat.fixture",caption:"Fictional post retained during a failed refresh.",timestamp:1,media:[])])
         case "inbox": return .init(threads:[.init(id:"21",title:"UAT fixture",preview:messages.last?.text ?? "")])
-        case "thread": return .init(messages:messages)
+        case "thread":
+            if ProcessInfo.processInfo.arguments.contains("--uat-delayed-reconcile"), messages.count > 1, !delayedReconciliation {
+                delayedReconciliation = true
+                try await Task.sleep(for: .seconds(5))
+            }
+            return .init(messages:messages)
         case "sendText":
+            if ProcessInfo.processInfo.arguments.contains("--uat-delayed-send") {
+                try await Task.sleep(for: .seconds(5))
+            }
             if ProcessInfo.processInfo.arguments.contains("--uat-blocked") {
                 return .init(error:"actionBlocked",diagnostic:["http":"400","reason":"feedback_required"])
             }

@@ -53,6 +53,10 @@ final class InstagramDataClient: ObservableObject {
     private var retryAfter = Date.distantPast
     private var loadedTabs: Set<PorchModel.Tab> = []
     private var acceptedThreads: Set<String> = []
+    // In-memory identities distinguish the submitted snapshot from later edits,
+    // even when the user rewrites the same text. Neither map enters the journal.
+    private var draftVersions: [String:UUID] = [:]
+    private var submittedDraftVersions: [String:UUID] = [:]
     private let journalKey = "porch.pending-sends.v1"
     var error: String? { tabErrors[activeTab] }
     var loading: Bool { loadingTabs.contains(activeTab) }
@@ -100,7 +104,8 @@ final class InstagramDataClient: ObservableObject {
         if (operation == "thread" || operation == "olderMessages"), result.error == nil, let attempt = pendingSends[identifier],
            result.messages.contains(where: { $0.mine && $0.context == attempt.context }) {
             diagnostics.record(.sendReconciled, sendFields(identifier, attempt))
-            resolveSend(identifier, reason:"matching_context"); drafts[identifier] = nil
+            acknowledgeDraft(identifier)
+            resolveSend(identifier, reason:"matching_context")
         }
         return result
     }
@@ -171,6 +176,8 @@ final class InstagramDataClient: ObservableObject {
         #if DEBUG
         (transport as? BlindUITransport)?.associate(attempt)
         #endif
+        if drafts[thread] == text { submittedDraftVersions[thread] = draftVersions[thread] }
+        else { submittedDraftVersions[thread] = nil }
         pendingSends[thread] = attempt; saveJournal()
         sendingThreads.insert(thread)
         fields = sendFields(thread, attempt); fields["message_utf16"] = String(text.utf16.count)
@@ -186,7 +193,8 @@ final class InstagramDataClient: ObservableObject {
             fields.merge(result.diagnostic) { _, b in b }
             if result.error == nil, let id = result.sentItemID, !id.isEmpty {
                 diagnostics.record(.sendReceipt,fields)
-                resolveSend(thread, reason:"server_receipt"); drafts[thread] = nil
+                acknowledgeDraft(thread)
+                resolveSend(thread, reason:"server_receipt")
                 return nil
             }
             let failure = Self.knownError(result.error) ?? "sendUnconfirmed"
@@ -210,17 +218,31 @@ final class InstagramDataClient: ObservableObject {
         }
         return fields
     }
-    func keepDraft(_ text: String, for thread: String) { drafts[thread] = text.isEmpty ? nil : String(text.prefix(4000)) }
+    func keepDraft(_ text: String, for thread: String) {
+        let value = text.isEmpty ? nil : String(text.prefix(4000))
+        guard drafts[thread] != value else { return }
+        draftVersions[thread] = UUID()
+        drafts[thread] = value
+    }
+    private func acknowledgeDraft(_ thread: String) {
+        if let submitted = submittedDraftVersions[thread], submitted == draftVersions[thread] {
+            keepDraft("", for: thread)
+        } else if drafts[thread] != nil {
+            diagnostics.record(.viewState, sendFields(thread, pendingSends[thread]).merging(
+                ["view": "Conversation", "state": "draft_preserved"]) { _, value in value })
+        }
+    }
     func resolveSend(_ thread: String, reason: String = "user_checked") {
         diagnostics.record(.sendWarningCleared,sendFields(thread,pendingSends[thread]).merging(["reason":reason]) { _, b in b })
-        pendingSends[thread] = nil; saveJournal()
+        pendingSends[thread] = nil; submittedDraftVersions[thread] = nil; saveJournal()
     }
     private func saveJournal() { defaults.set(try? JSONEncoder().encode(pendingSends), forKey: journalKey) }
-    func clearJournal() { pendingSends = [:]; lastSendDiagnostic = nil; defaults.removeObject(forKey: journalKey) }
+    func clearJournal() { pendingSends = [:]; submittedDraftVersions = [:]; lastSendDiagnostic = nil; defaults.removeObject(forKey: journalKey) }
     func close() {
         diagnostics.record(.sessionClosed,["pending_count":String(pendingSends.count),"generation":String(generation)])
         generation += 1; transport.close()
         posts = []; stories = []; threads = []; drafts = [:]; hasMore = false; moreLoading = false; moreError = nil
+        draftVersions = [:]; submittedDraftVersions = [:]
         inboxHasMore = false; inboxLoadingMore = false; inboxMoreError = nil
         loadingTabs = []; tabErrors = [:]; loadedTabs = []; acceptedThreads = []; sendingThreads = []; reachedSessionLimit = false
     }

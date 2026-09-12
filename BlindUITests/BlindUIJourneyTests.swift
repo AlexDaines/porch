@@ -44,7 +44,8 @@ final class BlindUIJourneyTests: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.terminate()
-        app.launchArguments = ["--blind-ui-fixture", "--blind-ui-run-id", UUID().uuidString.lowercased(), "--blind-ui-control", control]
+        app.launchArguments = ["--blind-ui-fixture", "--blind-ui-run-id", UUID().uuidString.lowercased(), "--blind-ui-control", control,
+            "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryL"]
         app.launch()
         return app
     }
@@ -53,8 +54,10 @@ final class BlindUIJourneyTests: XCTestCase {
         XCTAssertTrue(draft.waitForExistence(timeout: 5))
         draft.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10))
-        draft.tap(); draft.typeText(text)
-        XCTAssertEqual(draft.value as? String, text)
+        app.typeText(text)
+        let complete = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", text), object: draft)
+        XCTAssertEqual(XCTWaiter.wait(for: [complete], timeout: 5), .completed,
+            "The single typing action must produce the complete draft; observed: \(String(describing: draft.value))")
     }
     @MainActor private func capture(_ name: String) {
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())

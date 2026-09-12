@@ -30,6 +30,25 @@ final class DiagnosticsLogTests: XCTestCase {
         XCTAssertTrue(text.contains("ios_webkit"))
     }
 
+    func testComposerFocusExportRetainsCorrelationAndExcludesPrivateInput() async throws {
+        let log = DiagnosticsLog(directory: directory)
+        let action = DiagnosticAction(runID: UUID().uuidString, actionID: UUID().uuidString, brokerSequence: 3)
+        log.setActionContext(action)
+        let states = ["composer_focus_requested", "composer_focused", "composer_blurred", "draft_preserved"]
+        for state in states {
+            log.record(.viewState, ["view": "Conversation", "state": state,
+                "thread_ref": log.reference("PRIVATE_THREAD"), "text": "PRIVATE_DRAFT", "selection": "PRIVATE_SELECTION"])
+        }
+        log.record(.viewState, ["state": "composer_focused PRIVATE_DRAFT"])
+        let entries = await log.snapshot().entries
+        XCTAssertEqual(entries.prefix(states.count).compactMap { $0.fields["state"] }, states)
+        XCTAssertTrue(entries.allSatisfy { $0.fields["action_id"] == action.actionID })
+        XCTAssertNil(entries.last?.fields["state"], "Arbitrary focus-state strings must be rejected")
+        let exported = try String(contentsOf: await log.export(), encoding: .utf8)
+        XCTAssertFalse(exported.contains("PRIVATE"))
+        XCTAssertTrue(exported.contains("composer_focused"))
+    }
+
     func testDurableExportCorrelatesAcrossLaunchesWithoutPrivateValues() async throws {
         let first = DiagnosticsLog(directory: directory)
         let reference = first.reference("PRIVATE_THREAD")

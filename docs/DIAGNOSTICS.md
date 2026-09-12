@@ -19,7 +19,7 @@ Every report includes the current app/build, iOS version and hardware family eve
 | Network | Availability, interface category, constrained/expensive status, IPv4/IPv6/DNS capability; no IPs, SSIDs or endpoints |
 | Sign-in | User entry/cancellation, local session hint, verification result, suppressed checks, navigation category, HTTP status, page failures, cookie-change event without cookie values |
 | Transport | Queue depth/delay, generation, WebKit preparation/failure/termination, document/location origin categories, browser family, cookie-jar presence, claim bootstrap/update/reset categories, request sequence/interval, stages, sizes, parse outcome, preserved-large-integer count, duration, outcome, bounded model counts |
-| Native interface | Closed view and logical loading/ready/error/sending/acknowledgement states; draft-validity transitions without text |
+| Native interface | Closed view and logical loading/ready/error/sending/acknowledgement states; draft-validity transitions, composer focus requests/focus changes, and newer-draft preservation without text |
 | Messages | Input length, membership/context validation flags, prepared/dispatched attempt, receipt matching, rejection, uncertainty and reconciliation |
 | Media | Start/readiness/first playback/stop/failure; keyed URL reference, timing and known error domain/code with bounded underlying error codes; no per-frame event stream |
 | iOS diagnostics | MetricKit crash, hang, CPU, disk and launch diagnostics with at most 64 binary UUID/offset frames; payload time range and originating app version |
@@ -41,3 +41,7 @@ Storage failures cannot throw from `record` or trigger network activity. Failed 
 Reports exclude credentials and content, but still contain activity times, message lengths, device/build information and stable pseudonymous correlations. Share them deliberately. Nothing here reconstructs a failure from a build that did not yet record durable diagnostics.
 
 Debug Blind UI trials can attach UUID `run_id`/`action_id` and integer `broker_sequence` through a recorder handshake. Send attempts preserve the action captured at the button across async dispatch and journal recovery. Ambient callbacks carry the currently active action as temporal association only. `viewState` describes logical UI state; screenshots remain necessary to establish visible pixels. This adds no arbitrary text fields. See [the offline fixture contract](BLIND-UI.md).
+
+## Composer interaction
+
+Build 11 records `viewState` categories `composer_focus_requested`, `composer_focused`, `composer_blurred` and `draft_preserved`, correlated by the existing keyed `thread_ref` and action context when present. A focus request records the tap; focus-state transitions record SwiftUI focus binding changes. These events do not establish whether an onscreen keyboard appeared (an external keyboard may be active). `draft_preserved` means a direct receipt or later reconciliation retained a newer draft revision. Rewriting the same text still counts as a newer revision; restored attempts cannot clear drafts created in the current launch. Revision identities remain in memory and never enter the log or persistent journal. No tap coordinates, selection ranges, keyboard input or message content enter these events. The same closed schema is applied on storage and export.
