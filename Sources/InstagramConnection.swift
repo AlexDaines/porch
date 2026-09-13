@@ -76,7 +76,7 @@ final class InstagramConnection: ObservableObject {
             }
             let code: String?
             do {
-                let result = try await transport.execute("session", identifier: "", text: "", context: "")
+                let result = try await transport.execute("session", identifier: "", text: "", context: "", feedCount: 10)
                 code = result.error
             } catch { code = InstagramDataClient.code(error) }
             guard epoch == generation else { return }

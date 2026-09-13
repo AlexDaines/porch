@@ -104,7 +104,7 @@ private final class AuthenticationStub: InstagramAuthentication {
 private final class SessionStub: InstagramTransport {
     var requests = 0
     private var pending: CheckedContinuation<InstagramDataResult, Error>?
-    func execute(_ operation: String, identifier: String, text: String, context: String) async throws -> InstagramDataResult {
+    func execute(_ operation: String, identifier: String, text: String, context: String, feedCount: Int = 10) async throws -> InstagramDataResult {
         XCTAssertEqual(operation, "session")
         requests += 1
         return try await withCheckedThrowingContinuation { pending = $0 }

@@ -255,7 +255,7 @@ private final class StubTransport: InstagramTransport {
     var calls: [String] = []
     var hold = false
     private var pending: CheckedContinuation<InstagramDataResult,Error>?
-    func execute(_ operation:String,identifier:String,text:String,context:String) async throws -> InstagramDataResult {
+    func execute(_ operation:String,identifier:String,text:String,context:String,feedCount:Int = 10) async throws -> InstagramDataResult {
         calls.append(operation)
         if hold { return try await withCheckedThrowingContinuation { pending = $0 } }
         return results.removeFirst()

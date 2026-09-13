@@ -1,5 +1,17 @@
 # Verification
 
+## September 13 — build 12 deliberate feed batches
+
+The initial complete offline suite passed **81 checks, zero failures or skips**, as counted by Xcode's result summary. It includes the existing authentication, diagnostics/privacy, playback and composer regressions plus the feed additions below. The unsigned UAT Release archive built successfully and its plist independently reports `dev.alex.porch`, version 0.2, build 12.
+
+The focused client/adapter suite passed 24 checks with no failures. Ten new pagination checks cover initial overflow, 20-post choices, one-request bounds, deduplication, partial/final and duplicate-only pages, atomic error recovery, the combined 200-record capacity, successful/failed refresh, both refresh/batch overlap orders, and session close while refresh waits. Adapter checks verify the requested count on the wire, retention beyond the former 18-post cut-off, and cursor preservation when normalized pages or cursor contracts are invalid. These are synthetic contract checks, not claims about Instagram's live page size.
+
+Both new native UI journeys passed. Opening and dismissing the dropdown leaves the count unchanged; one selection reveals the chosen batch while retaining server overflow, and a later choice handles a short final page. Maximum Dynamic Type keeps all three options reachable with targets of at least 44 points. The staff helper observes the expected loaded count after one selection; it does not select again to repair a result. Closed/open screenshots were inspected at [regular size](docs/images/feed-choice-closed.png), [regular menu](docs/images/feed-choice-open.png), [maximum text](docs/images/feed-choice-large-closed.png), and [maximum-text menu](docs/images/feed-choice-large-open.png). Every screenshot contains synthetic content.
+
+The count describes currently available posts, not reading or viewing behavior. No analytics, read markers, timers or message operations were added. The app still uses the existing request trace and closed diagnostic schema. Build 12's Release, full regression/CI results, installed version and physical launch must each be verified separately; no live message test is part of this refinement.
+
+The final retry-state correction moves the failed batch amount from view-local state into the client, so leaving the feed and returning cannot change five to the default ten. A separate native UI regression chooses five, receives a synthetic failure, visits Messages, returns and retries once; the expected total is six. Final-head CI and device availability are recorded in [PR #3](https://github.com/AlexDaines/porch/pull/3).
+
 ## September 12 — build 11 composer and draft refinement
 
 The complete offline suite passed **67 checks, zero failures or skips**, as counted by Xcode's result summary, in `artifacts/private/build11-verified.xcresult`. This includes 54 XCTest unit methods, the adapter checks, and ten native UI journeys. Both dedicated offline-fixture journeys also passed in `artifacts/private/build11-blind-fixture.xcresult`, including uncertain-send reconciliation, with the second-tap helper removed. These are synthetic regression results, not a blind participant result or live Instagram-delivery proof.

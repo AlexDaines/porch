@@ -2,7 +2,7 @@
 
 Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and a personal accent for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
 
-Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Entry screens, control groups and sheet titles are centered. Reading paragraphs retain 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead, counters or decorative panels compete with the content.
+Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Entry screens, control groups and sheet titles are centered. Reading paragraphs retain 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead or decorative panels compete with the content. A quiet loaded count appears only at the feed's natural pause.
 
 Every Porch interface shape has sharp corners. Swatches, selection outlines, avatars, play-button backgrounds and message fields are rectangular. App sheets explicitly use a zero corner radius and no drag handle. Settings uses a plain header; confirmations appear inline with explicit confirm and cancel actions. This rule governs Porch's surfaces; Instagram authentication and OS-owned keyboards, sharing and playback controls retain their own rendering.
 
@@ -27,6 +27,16 @@ Accent contrast is at least 9.7:1 against black and 8.8:1 against the raised sur
 The system launch screen uses an explicit black color asset and dark appearance, matching the native canvas before SwiftUI loads. [Apple's launch-background key](https://developer.apple.com/documentation/bundleresources/information-property-list/uilaunchscreen/uicolorname) otherwise defaults to the device's system background; that produced a white startup flash on a device using light appearance.
 
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
+
+## Deliberate feed batches
+
+Awareness supports informed choice. Porch reports what it has made available without rewarding extra consumption or treating stopping as failure. There are no pressure timers, guilt cues, streaks, subscriptions or new behavioral analytics. “N posts loaded” counts the posts currently available in the visible feed, not posts read or seen; pending records are not included. This count resets on successful refresh or session end and is not a usage history.
+
+The first page reveals up to 10 posts. At the natural pause, More posts opens a native iOS dropdown offering up to 5, 10 or 20 more posts. Opening or dismissing it does nothing to the feed. Selecting a number performs one deliberate batch; the menu inherits native accessibility and presentation, while Porch's surrounding controls remain sharp and use the chosen accent. The OS-owned menu is covered by the existing system-interface exception above.
+
+Instagram's requested page size is advisory. A batch uses pending eligible posts first and makes at most one GET for the missing amount. Complete normalized pages are deduplicated and their overflow stays pending for later choices; a short or duplicate-only page never triggers another automatic request. Partial batches with another page available receive a brief factual result. If the server has ended, choices reflect only the actual remaining pending posts. A failed request keeps the buffer pending so retrying cannot exceed the chosen batch. The client retains that choice when leaving the feed and returning; reconstructing the view cannot change a retry to its default amount.
+
+Visible and pending posts together retain at most 200 records per session. Choices shrink to the remaining capacity. The technical boundary is stated plainly and offers Reload feed, which returns to the top; this is a storage bound, not a usage quota. Reloading starts a fresh feed; it does not continue past the current feed’s 200-post bound. An oversized normalized adapter page fails before its cursor advances instead of silently skipping its tail. Refresh reserves the feed, waits for any complete batch, and replaces its buffer and cursor only on success. Closing the session cancels pending work; late results cannot repopulate it.
 
 ## Sign-in journey
 

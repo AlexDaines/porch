@@ -1,6 +1,78 @@
 import XCTest
 
 final class UATFlowsTests: XCTestCase {
+    @MainActor func testFailedFivePostChoiceSurvivesLeavingFeedBeforeRetry() {
+        let app = fixture(extra: ["--uat-feed-choice", "--uat-feed-retry"])
+        let more = app.buttons["feed-more-posts"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap(); app.buttons["Up to 5 posts"].tap()
+        XCTAssertTrue(app.staticTexts["You're offline. Connect and try again."].waitForExistence(timeout: 5))
+        app.buttons["tab-Messages"].tap()
+        XCTAssertTrue(app.staticTexts["UAT fixture"].waitForExistence(timeout: 5))
+        app.buttons["tab-Feed"].tap()
+        let retry = app.buttons["TRY AGAIN"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5)); retry.tap()
+        reachFeedBoundary(app, target: more, count: 6)
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "6 posts loaded", "Returning to the feed must preserve the chosen five, not a view-local default")
+    }
+    @MainActor func testFeedChoiceLoadsOnlyOnSelectionAndRetainsOverflow() {
+        let app = fixture(extra: ["--uat-feed-choice"])
+        let more = app.buttons["feed-more-posts"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "1 post loaded")
+        XCTAssertGreaterThanOrEqual(more.frame.height, 44)
+        snapshot("Feed choice closed")
+        more.tap()
+        for amount in [5, 10, 20] { XCTAssertTrue(app.buttons["Up to \(amount) posts"].waitForExistence(timeout: 5)) }
+        snapshot("Feed choice open")
+        app.buttons["tab-Feed"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(app.buttons["Up to 5 posts"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "1 post loaded", "Opening and dismissing must not load posts")
+        more.tap(); app.buttons["Up to 5 posts"].tap()
+        reachFeedBoundary(app, target: more, count: 6)
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "6 posts loaded", "Server overflow must stay pending")
+        more.tap(); app.buttons["Up to 10 posts"].tap()
+        let end = app.staticTexts["feed-end"]
+        reachFeedBoundary(app, target: end, count: 11)
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "11 posts loaded", "Reveal the pending three and short final two without another page")
+        XCTAssertEqual(end.label, "No more posts")
+        XCTAssertFalse(more.exists)
+    }
+    @MainActor func testFeedChoiceAtLargestTextSizeKeepsAllAmountsReachable() {
+        let app = fixture(extra: ["--uat-feed-choice", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"])
+        let more = app.buttons["feed-more-posts"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        reachFeedBoundary(app, target: more, count: 1)
+        XCTAssertGreaterThanOrEqual(more.frame.height, 44)
+        snapshot("Large text feed choice closed")
+        more.tap()
+        for amount in [5, 10, 20] {
+            let option = app.buttons["Up to \(amount) posts"]
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            XCTAssertTrue(option.isHittable)
+            XCTAssertGreaterThanOrEqual(option.frame.height, 44)
+        }
+        snapshot("Large text feed choice open")
+        app.buttons["Up to 5 posts"].tap()
+        reachFeedBoundary(app, target: more, count: 6)
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "6 posts loaded")
+    }
+    @MainActor private func reachFeedBoundary(_ app: XCUIApplication, target: XCUIElement, count: Int) {
+        // Move to the deliberate boundary; scrolling itself must never fetch.
+        for _ in 0..<20 {
+            let loaded = app.staticTexts["feed-loaded-count"]
+            let expected = "\(count) \(count == 1 ? "post" : "posts") loaded"
+            if target.exists && target.isHittable && loaded.exists && loaded.label == expected && !app.progressIndicators.firstMatch.exists { return }
+            app.scrollViews["native-feed"].swipeUp()
+        }
+        XCTAssertTrue(target.exists && target.isHittable, "The feed boundary must remain reachable")
+    }
+    @MainActor private func snapshot(_ name: String) {
+        // Let the native menu compositor settle before preserving a review image.
+        Thread.sleep(forTimeInterval: 1)
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
     @MainActor func testReconciliationPreservesEditsMadeWhileChecking() {
         let app = fixture(extra: ["--uat-unconfirmed", "--uat-delayed-reconcile"])
         app.buttons["tab-Messages"].tap()
