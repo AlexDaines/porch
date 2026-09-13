@@ -4,6 +4,59 @@ import WebKit
 
 @MainActor
 final class DataAdapterTests: XCTestCase {
+    func testFeedCountIsAdvisoryAndCompleteEligiblePageCrossesBridge() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        try await harness.script(#"""
+        globalThis.feedPost = id => ({media_or_ad:{id:String(id),taken_at:id,media_type:1,
+          user:{pk:1,username:'fictional',friendship_status:{following:true}},
+          image_versions2:{candidates:[{url:'https://s.cdninstagram.com/fixture.jpg'}]}}});
+        globalThis.pages = [
+          {pagination_source:'following',more_available:true,next_max_id:'page-two',feed_items:Array.from({length:25},(_,i)=>feedPost(i+1))},
+          {pagination_source:'following',more_available:false,feed_items:[feedPost(26)]}
+        ];
+        """#)
+        let invalid = try await harness.request("feed", feedCount: 0)
+        XCTAssertEqual(invalid.error, "unavailable")
+        let feed = try await harness.request("feed", feedCount: 5)
+        XCTAssertEqual(feed.posts.count, 25, "A small request must not silently discard server overflow")
+        XCTAssertTrue(feed.hasMore)
+        let next = try await harness.request("moreFeed", feedCount: 20)
+        XCTAssertEqual(next.posts.map(\.id), ["26"])
+        XCTAssertFalse(next.hasMore)
+        let requests = try await harness.script("return calls.map(c=>c.path);") as? [String]
+        XCTAssertEqual(requests, [
+            "/api/v1/feed/timeline/?count=5&pagination_source=following&reason=pull_to_refresh",
+            "/api/v1/feed/timeline/?count=20&pagination_source=following&reason=pull_to_refresh&max_id=page-two"
+        ])
+    }
+    func testOversizedPageAndInvalidCursorFailWithoutAdvancingCursor() async throws {
+        let harness = AdapterHarness()
+        try await harness.prepare()
+        try await harness.script(#"""
+        globalThis.feedPost = id => ({media_or_ad:{id:String(id),media_type:1,
+          user:{pk:1,username:'fictional',friendship_status:{following:true}},
+          image_versions2:{candidates:[{url:'https://s.cdninstagram.com/fixture.jpg'}]}}});
+        const page = (items, cursor) => ({pagination_source:'following',more_available:true,next_max_id:cursor,feed_items:items});
+        const huge = feedPost('huge');
+        huge.media_or_ad.image_versions2.candidates[0].url = 'https://s.cdninstagram.com/' + 'x'.repeat(910000);
+        globalThis.pages = [page([feedPost(1)],'kept'),
+          page(Array.from({length:201},(_,i)=>feedPost(i+2)),'discarded'),
+          page([huge],'discarded'), page([feedPost(2)],null), page([feedPost(2)],'kept'),
+          {pagination_source:'following',more_available:false,feed_items:[feedPost(2)]}];
+        """#)
+        let first = try await harness.request("feed")
+        XCTAssertTrue(first.hasMore)
+        for _ in 0..<4 {
+            let rejected = try await harness.request("moreFeed", feedCount: 5)
+            XCTAssertEqual(rejected.error, "unsupported")
+            XCTAssertTrue(rejected.posts.isEmpty)
+        }
+        let final = try await harness.request("moreFeed", feedCount: 5)
+        XCTAssertEqual(final.posts.map(\.id), ["2"])
+        let retained = try await harness.script("return calls.length === 6 && calls.slice(1).every(c=>c.path.endsWith('&max_id=kept'));") as? Bool
+        XCTAssertEqual(retained, true)
+    }
     func testSessionRequiresAuthenticatedInboxWithoutReturningMessages() async throws {
         let harness = AdapterHarness()
         try await harness.prepare()
@@ -395,10 +448,10 @@ private final class AdapterHarness: NSObject, WKNavigationDelegate {
     @discardableResult func script(_ text:String) async throws -> Any? {
         try await webView.callAsyncJavaScript(text,arguments:[:],in:nil,contentWorld:.defaultClient)
     }
-    func request(_ operation:String,identifier:String = "",message:String = "",context:String = "1234567890123456789") async throws -> InstagramDataResult {
+    func request(_ operation:String,identifier:String = "",message:String = "",context:String = "1234567890123456789",feedCount:Int = 10) async throws -> InstagramDataResult {
         let path = try XCTUnwrap(Bundle.main.url(forResource:"instagram-data",withExtension:"js"))
         let source = try String(contentsOf:path,encoding:.utf8)
-        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier,"messageText":message,"clientContext":context,"requestTraceID":UUID().uuidString,"diagnosticKey":String(repeating:"a",count:64)],in:nil,contentWorld:.defaultClient)
+        let output = try await webView.callAsyncJavaScript(source,arguments:["operation":operation,"identifier":identifier,"feedCount":feedCount,"messageText":message,"clientContext":context,"requestTraceID":UUID().uuidString,"diagnosticKey":String(repeating:"a",count:64)],in:nil,contentWorld:.defaultClient)
         let text = try XCTUnwrap(output as? String)
         return try JSONDecoder().decode(InstagramDataResult.self,from:Data(text.utf8))
     }

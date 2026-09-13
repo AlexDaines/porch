@@ -201,17 +201,24 @@ try {
     // Only authenticated success crosses to native code. No conversation content.
   } else if (operation === 'feed' || operation === 'moreFeed') {
     if (operation === 'moreFeed' && !state.feedCursor) throw new Error('unavailable');
+    const count = typeof feedCount === 'undefined' ? 10 : feedCount;
+    if (!Number.isInteger(count) || count < 1 || count > 20) throw new Error('unavailable');
     const cursor = operation === 'moreFeed' ? '&max_id=' + encodeURIComponent(state.feedCursor) : '';
-    const data = await request('/api/v1/feed/timeline/?count=12&pagination_source=following&reason=pull_to_refresh' + cursor);
+    const data = await request('/api/v1/feed/timeline/?count=' + count + '&pagination_source=following&reason=pull_to_refresh' + cursor);
     if (!Array.isArray(data.feed_items) || data.pagination_source !== 'following' || data.is_shell_response === true) throw new Error('unsupported');
     result.diagnostic.raw_count = String(data.feed_items.length);
-    const nextCursor = data.more_available && data.next_max_id ? String(data.next_max_id).slice(0, 2048) : null;
+    const nextCursor = data.more_available ? stringID(data.next_max_id) : null;
+    if (data.more_available && (!nextCursor || nextCursor.length > 2048)) throw new Error('unsupported');
     if (operation === 'moreFeed' && nextCursor === state.feedCursor) throw new Error('unsupported');
-    state.feedCursor = nextCursor;
-    result.hasMore = Boolean(state.feedCursor);
     // Suggested-user and recommendation modules are never passed to the renderer.
-    result.posts = data.feed_items.filter(wrapper => !isAd(wrapper)).map(wrapper => post(wrapper.media_or_ad)).filter(Boolean);
-    result.posts = [...new Map(result.posts.map(p => [p.id, p])).values()].sort((a,b) => b.timestamp-a.timestamp).slice(0, 18);
+    const eligible = data.feed_items.filter(wrapper => !isAd(wrapper)).map(wrapper => post(wrapper.media_or_ad)).filter(Boolean);
+    const posts = [...new Map(eligible.map(p => [p.id, p])).values()].sort((a,b) => b.timestamp-a.timestamp);
+    // Page size is advisory. Preserve the complete normalized page for the
+    // native buffer; reject an oversized contract before advancing the cursor.
+    if (posts.length > 200 || new TextEncoder().encode(JSON.stringify(posts)).length > 900000) throw new Error('unsupported');
+    result.posts = posts;
+    state.feedCursor = nextCursor;
+    result.hasMore = Boolean(nextCursor);
   } else if (operation === 'stories') {
     const data = await request('/api/v1/feed/reels_tray/');
     if (!Array.isArray(data.tray)) throw new Error('unsupported');

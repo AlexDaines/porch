@@ -3,7 +3,7 @@ import WebKit
 
 @MainActor
 protocol InstagramTransport: AnyObject {
-    func execute(_ operation: String, identifier: String, text: String, context: String) async throws -> InstagramDataResult
+    func execute(_ operation: String, identifier: String, text: String, context: String, feedCount: Int) async throws -> InstagramDataResult
     func close()
 }
 
@@ -26,7 +26,7 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
 
     init(diagnostics: DiagnosticsLog = .shared) { self.diagnostics = diagnostics; super.init() }
 
-    func execute(_ operation: String, identifier: String = "", text: String = "", context: String = "") async throws -> InstagramDataResult {
+    func execute(_ operation: String, identifier: String = "", text: String = "", context: String = "", feedCount: Int = 10) async throws -> InstagramDataResult {
         #if BLIND_UI_FIXTURE
         throw InstagramDataClient.ClientError.unavailable
         #else
@@ -71,7 +71,7 @@ final class WebKitInstagramTransport: NSObject, InstagramTransport, WKNavigation
                 let script = try String(contentsOf: path, encoding: .utf8)
                 let started = Date()
                 let value = try await view.callAsyncJavaScript(script, arguments: ["operation": operation, "identifier": identifier,
-                    "messageText": text, "clientContext": context, "requestTraceID": id.uuidString,
+                    "messageText": text, "clientContext": context, "feedCount": feedCount, "requestTraceID": id.uuidString,
                     "diagnosticKey": self.diagnostics.adapterDiagnosticKey], in: nil, contentWorld: .defaultClient)
                 try Task.checkCancellation()
                 guard epoch == self.generation else { throw CancellationError() }

@@ -29,32 +29,78 @@ struct InstagramPost: Decodable, Identifiable {
 struct NativeFeed: View {
     let posts: [InstagramPost]
     var hasMore = false
-    var more: (() -> Void)?
+    var more: ((Int) -> Void)?
+    var batchOptions = [5, 10, 20]
+    var lastBatch: InstagramDataClient.FeedBatch?
     var moreLoading = false
+    var refreshing = false
     var moreError: String?
     var reachedSessionLimit = false
     var refresh: (() async -> Void)?
+    @Environment(\.porchAccent) private var accent
+    @State private var lastChoice = 10
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(spacing: 16) {
+                Color.clear.frame(height: 0).id("feed-top").accessibilityHidden(true)
                 ForEach(posts) { post in NativePostCard(post: post) }
                 if posts.isEmpty {
                     Text("No posts.").font(PorchTheme.body).foregroundStyle(PorchTheme.muted).padding(.top, 40)
                 }
                 if let moreError, let more, moreError != "signIn" {
                     LoadFailure(code:moreError,retry:{
-                        if ["unavailable","unsupported"].contains(moreError) { Task { await refresh?() } } else { more() }
+                        if ["unavailable","unsupported"].contains(moreError) { Task { await refresh?() } } else { more(lastChoice) }
                     },actionTitle:["unavailable","unsupported"].contains(moreError) ? "RELOAD FEED" : nil)
                 }
-                if moreLoading { ProgressView().accessibilityLabel("Loading more posts") }
-                if hasMore, let more {
-                    Button("MORE POSTS", action: more).font(PorchTheme.utility).tracking(0.4).frame(minHeight:44).padding(.vertical,16).disabled(moreLoading)
-                } else if !posts.isEmpty {
-                    Eyebrow(text:reachedSessionLimit ? "Session limit reached. Reload to start again." : "No more posts").padding(.vertical, 24)
+                VStack(spacing: 4) {
+                    Text("\(posts.count) \(posts.count == 1 ? "post" : "posts") loaded")
+                        .font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                        .accessibilityIdentifier("feed-loaded-count")
+                    if moreLoading { ProgressView().accessibilityLabel("Loading more posts") }
+                    if hasMore, let more {
+                        Menu {
+                            ForEach(batchOptions, id: \.self) { amount in
+                                Button("Up to \(amount) \(amount == 1 ? "post" : "posts")") {
+                                    lastChoice = amount
+                                    more(amount)
+                                }.accessibilityIdentifier("feed-load-\(amount)")
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("MORE POSTS").tracking(0.4)
+                                Image(systemName: "chevron.down").accessibilityHidden(true)
+                            }.font(PorchTheme.utility).foregroundStyle(accent)
+                                .frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain).disabled(moreLoading || refreshing)
+                            .accessibilityLabel("More posts").accessibilityHint("Choose how many posts to load")
+                            .accessibilityIdentifier("feed-more-posts")
+                        if let lastBatch, lastBatch.added < lastBatch.requested, moreError == nil {
+                            Text(lastBatch.added == 0 ? "No new posts in this batch." : "\(lastBatch.added) added this time.")
+                                .font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                                .accessibilityIdentifier("feed-batch-result")
+                        }
+                    } else if !posts.isEmpty {
+                        Text(reachedSessionLimit ? "200-post limit for this session." : "No more posts")
+                            .font(PorchTheme.detail).foregroundStyle(PorchTheme.muted)
+                            .accessibilityIdentifier("feed-end")
+                        if reachedSessionLimit, let refresh {
+                            Button("RELOAD FEED") {
+                                // This explicit restart brings the refreshed feed
+                                // (or a refresh error) back into view.
+                                proxy.scrollTo("feed-top", anchor: .top)
+                                Task { await refresh() }
+                            }.font(PorchTheme.utility).foregroundStyle(accent)
+                                .frame(minHeight: 44).disabled(refreshing)
+                                .accessibilityIdentifier("feed-reload")
+                        }
+                    }
                 }
+                .multilineTextAlignment(.center).padding(.horizontal, 20).padding(.vertical, 20)
             }
         }.scrollIndicators(.hidden).background(PorchTheme.canvas)
             .accessibilityIdentifier("native-feed").refreshable { await refresh?() }
+        }
     }
 }
 

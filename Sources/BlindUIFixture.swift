@@ -223,7 +223,7 @@ final class BlindUITransport: InstagramTransport {
         self.store = store; self.control = control; self.diagnostics = diagnostics
     }
     func associate(_ attempt: SendAttempt) { attempts[attempt.context] = attempt }
-    func execute(_ operation: String, identifier: String, text: String, context: String) async throws -> InstagramDataResult {
+    func execute(_ operation: String, identifier: String, text: String, context: String, feedCount: Int = 10) async throws -> InstagramDataResult {
         guard !closing && !store.isClosed else { return .init(error: "unavailable") }
         let requestID = UUID().uuidString
         let attempt = attempts.removeValue(forKey: context)

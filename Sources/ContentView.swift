@@ -122,8 +122,9 @@ struct ContentView: View {
                     case .stories: NativeStories(people:client.stories,client:client).porchTrace("Stories", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     case .messages: NativeInbox(threads:client.threads,client:client).porchTrace("Messages", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     case .feed:
-                        NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ Task { await client.morePosts() } },
-                            moreLoading:client.moreLoading,moreError:client.moreError,reachedSessionLimit:client.reachedSessionLimit,
+                        NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ count in Task { await client.morePosts(count: count) } },
+                            batchOptions:client.feedBatchOptions,lastBatch:client.lastFeedBatch,
+                            moreLoading:client.moreLoading,refreshing:client.loading,moreError:client.moreError,reachedSessionLimit:client.reachedSessionLimit,
                             refresh:{ await client.load(.feed,refresh:true) })
                             .porchTrace("Feed", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     }

@@ -37,6 +37,7 @@ final class InstagramDataClient: ObservableObject {
     @Published private(set) var inboxMoreError: String?
     @Published private(set) var moreError: String?
     @Published private(set) var reachedSessionLimit = false
+    @Published private(set) var lastFeedBatch: FeedBatch?
     @Published private var loadingTabs: Set<PorchModel.Tab> = []
     @Published private var tabErrors: [PorchModel.Tab:String] = [:]
     @Published private var activeTab: PorchModel.Tab = .feed
@@ -53,6 +54,16 @@ final class InstagramDataClient: ObservableObject {
     private var retryAfter = Date.distantPast
     private var loadedTabs: Set<PorchModel.Tab> = []
     private var acceptedThreads: Set<String> = []
+    private var pendingFeed: [InstagramPost] = []
+    private var feedHasMore = false
+    private var feedTruncated = false
+    private var feedBatchTask: Task<Void, Never>?
+    static let feedSessionLimit = 200
+    struct FeedBatch { let requested: Int; let added: Int }
+    var feedBatchOptions: [Int] {
+        let available = min(Self.feedSessionLimit - posts.count, feedHasMore ? 20 : pendingFeed.count)
+        return Array(Set([5, 10, 20].map { min($0, available) })).filter { $0 > 0 }.sorted()
+    }
     // In-memory identities distinguish the submitted snapshot from later edits,
     // even when the user rewrites the same text. Neither map enters the journal.
     private var draftVersions: [String:UUID] = [:]
@@ -72,15 +83,15 @@ final class InstagramDataClient: ObservableObject {
             diagnostics.record(.sendRestored, sendFields(thread, attempt).merging(["reason":"journal_restored"]) { _, b in b })
         }
     }
-    func request(_ operation: String, identifier: String = "") async throws -> InstagramDataResult {
+    func request(_ operation: String, identifier: String = "", feedCount: Int = 10) async throws -> InstagramDataResult {
         guard ["feed","moreFeed","stories","story","inbox","moreInbox","thread","olderMessages"].contains(operation) else { throw ClientError.unavailable }
-        return try await execute(operation, identifier: identifier)
+        return try await execute(operation, identifier: identifier, feedCount: feedCount)
     }
-    private func execute(_ operation: String, identifier: String = "", text: String = "", context: String = "") async throws -> InstagramDataResult {
+    private func execute(_ operation: String, identifier: String = "", text: String = "", context: String = "", feedCount: Int = 10) async throws -> InstagramDataResult {
         guard now() >= retryAfter else { throw ClientError.rateLimited }
         let epoch = generation
         let result: InstagramDataResult
-        do { result = try await transport.execute(operation, identifier: identifier, text: text, context: context) }
+        do { result = try await transport.execute(operation, identifier: identifier, text: text, context: context, feedCount: feedCount) }
         catch {
             if epoch == generation {
                 diagnostic = "View: \(operation)\nHTTP: none\nResult: \(Self.code(error))"
@@ -119,6 +130,10 @@ final class InstagramDataClient: ObservableObject {
         let epoch = generation
         defer { if epoch == generation { loadingTabs.remove(tab) } }
         do {
+            // Reserve the refresh first, then let the complete batch (including its
+            // buffer update) finish before replacing the adapter's cursor.
+            if tab == .feed { await feedBatchTask?.value }
+            guard epoch == generation, !Task.isCancelled else { return }
             let result = try await request(tab == .stories ? "stories" : tab == .messages ? "inbox" : "feed")
             guard epoch == generation else { return }
             guard result.error == nil else { tabErrors[tab] = Self.knownError(result.error); return }
@@ -126,26 +141,57 @@ final class InstagramDataClient: ObservableObject {
             switch tab {
             case .stories: stories = result.stories
             case .messages: threads = result.threads; inboxHasMore = result.hasMore; inboxMoreError = nil
-            case .feed: posts = result.posts; hasMore = result.hasMore; moreError = nil; reachedSessionLimit = false
+            case .feed:
+                posts = []; pendingFeed = []; feedTruncated = false; lastFeedBatch = nil
+                acceptFeedPage(result)
+                revealFeedPosts(10)
+                moreError = nil
             }
         } catch { if epoch == generation { tabErrors[tab] = Self.code(error) } }
     }
-    func morePosts() async {
-        guard !moreLoading, !loadingTabs.contains(.feed), hasMore else { return }
+    func morePosts(count: Int = 10) async {
+        guard (1...20).contains(count), !moreLoading, !loadingTabs.contains(.feed), hasMore else { return }
         moreLoading = true; moreError = nil
         let epoch = generation
-        defer { if epoch == generation { moreLoading = false } }
+        let task = Task { await self.appendFeedBatch(count: count, epoch: epoch) }
+        feedBatchTask = task
+        await task.value
+        if epoch == generation { moreLoading = false; feedBatchTask = nil }
+    }
+    private func appendFeedBatch(count: Int, epoch: Int) async {
+        let amount = min(count, Self.feedSessionLimit - posts.count)
+        lastFeedBatch = nil
         do {
-            let result = try await request("moreFeed")
-            guard epoch == generation else { return }
-            guard result.error == nil else { moreError = Self.knownError(result.error); return }
-            var existing = Set(posts.map(\.id))
-            let additions = result.posts.filter { existing.insert($0.id).inserted }
-            let room = max(0, 200 - posts.count)
-            posts.append(contentsOf: additions.prefix(room))
-            reachedSessionLimit = posts.count >= 200 && result.hasMore
-            hasMore = result.hasMore && !reachedSessionLimit
-        } catch { if epoch == generation { moreError = Self.code(error) } }
+            if pendingFeed.count < amount && feedHasMore {
+                // At most one request. A short or duplicate-only page is a pause,
+                // never a reason to chase more pages automatically.
+                let result = try await request("moreFeed", feedCount: amount - pendingFeed.count)
+                guard epoch == generation, !Task.isCancelled else { return }
+                if let error = result.error { moreError = Self.knownError(error); return }
+                acceptFeedPage(result)
+            }
+        } catch { if epoch == generation { moreError = Self.code(error) }; return }
+        guard epoch == generation, !Task.isCancelled else { return }
+        let before = posts.count
+        revealFeedPosts(amount)
+        lastFeedBatch = FeedBatch(requested: amount, added: posts.count - before)
+    }
+    private func acceptFeedPage(_ result: InstagramDataResult) {
+        var existing = Set((posts + pendingFeed).map(\.id))
+        let additions = result.posts.filter { existing.insert($0.id).inserted }
+        let room = max(0, Self.feedSessionLimit - posts.count - pendingFeed.count)
+        pendingFeed.append(contentsOf: additions.prefix(room))
+        // Only the explicit, visible session boundary may truncate a page. All
+        // overflow within that boundary stays in memory for later choices.
+        feedTruncated = feedTruncated || additions.count > room
+        feedHasMore = result.hasMore
+    }
+    private func revealFeedPosts(_ count: Int) {
+        let amount = min(count, pendingFeed.count)
+        posts.append(contentsOf: pendingFeed.prefix(amount))
+        pendingFeed.removeFirst(amount)
+        reachedSessionLimit = posts.count >= Self.feedSessionLimit && (feedHasMore || feedTruncated)
+        hasMore = posts.count < Self.feedSessionLimit && (!pendingFeed.isEmpty || feedHasMore)
     }
     func moreConversations() async {
         guard inboxHasMore, !inboxLoadingMore, !loadingTabs.contains(.messages) else { return }
@@ -241,6 +287,8 @@ final class InstagramDataClient: ObservableObject {
     func close() {
         diagnostics.record(.sessionClosed,["pending_count":String(pendingSends.count),"generation":String(generation)])
         generation += 1; transport.close()
+        feedBatchTask?.cancel(); feedBatchTask = nil
+        pendingFeed = []; feedHasMore = false; feedTruncated = false; lastFeedBatch = nil
         posts = []; stories = []; threads = []; drafts = [:]; hasMore = false; moreLoading = false; moreError = nil
         draftVersions = [:]; submittedDraftVersions = [:]
         inboxHasMore = false; inboxLoadingMore = false; inboxMoreError = nil
