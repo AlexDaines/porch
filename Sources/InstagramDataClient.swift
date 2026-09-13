@@ -160,6 +160,7 @@ final class InstagramDataClient: ObservableObject {
         if epoch == generation { moreLoading = false; feedBatchTask = nil }
     }
     private func appendFeedBatch(count: Int, epoch: Int) async {
+        guard epoch == generation, !Task.isCancelled else { return }
         let amount = min(count, Self.feedSessionLimit - posts.count)
         feedRetryCount = amount
         lastFeedBatch = nil
