@@ -38,6 +38,7 @@ final class InstagramDataClient: ObservableObject {
     @Published private(set) var moreError: String?
     @Published private(set) var reachedSessionLimit = false
     @Published private(set) var lastFeedBatch: FeedBatch?
+    private(set) var feedRetryCount = 10
     @Published private var loadingTabs: Set<PorchModel.Tab> = []
     @Published private var tabErrors: [PorchModel.Tab:String] = [:]
     @Published private var activeTab: PorchModel.Tab = .feed
@@ -142,7 +143,7 @@ final class InstagramDataClient: ObservableObject {
             case .stories: stories = result.stories
             case .messages: threads = result.threads; inboxHasMore = result.hasMore; inboxMoreError = nil
             case .feed:
-                posts = []; pendingFeed = []; feedTruncated = false; lastFeedBatch = nil
+                posts = []; pendingFeed = []; feedTruncated = false; lastFeedBatch = nil; feedRetryCount = 10
                 acceptFeedPage(result)
                 revealFeedPosts(10)
                 moreError = nil
@@ -160,6 +161,7 @@ final class InstagramDataClient: ObservableObject {
     }
     private func appendFeedBatch(count: Int, epoch: Int) async {
         let amount = min(count, Self.feedSessionLimit - posts.count)
+        feedRetryCount = amount
         lastFeedBatch = nil
         do {
             if pendingFeed.count < amount && feedHasMore {
@@ -288,7 +290,7 @@ final class InstagramDataClient: ObservableObject {
         diagnostics.record(.sessionClosed,["pending_count":String(pendingSends.count),"generation":String(generation)])
         generation += 1; transport.close()
         feedBatchTask?.cancel(); feedBatchTask = nil
-        pendingFeed = []; feedHasMore = false; feedTruncated = false; lastFeedBatch = nil
+        pendingFeed = []; feedHasMore = false; feedTruncated = false; lastFeedBatch = nil; feedRetryCount = 10
         posts = []; stories = []; threads = []; drafts = [:]; hasMore = false; moreLoading = false; moreError = nil
         draftVersions = [:]; submittedDraftVersions = [:]
         inboxHasMore = false; inboxLoadingMore = false; inboxMoreError = nil

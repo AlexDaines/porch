@@ -123,7 +123,7 @@ struct ContentView: View {
                     case .messages: NativeInbox(threads:client.threads,client:client).porchTrace("Messages", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")
                     case .feed:
                         NativeFeed(posts:client.posts,hasMore:client.hasMore,more:{ count in Task { await client.morePosts(count: count) } },
-                            batchOptions:client.feedBatchOptions,lastBatch:client.lastFeedBatch,
+                            batchOptions:client.feedBatchOptions,lastBatch:client.lastFeedBatch,retryCount:client.feedRetryCount,
                             moreLoading:client.moreLoading,refreshing:client.loading,moreError:client.moreError,reachedSessionLimit:client.reachedSessionLimit,
                             refresh:{ await client.load(.feed,refresh:true) })
                             .porchTrace("Feed", state: client.loading ? "loading" : client.error == nil ? "ready" : "error")

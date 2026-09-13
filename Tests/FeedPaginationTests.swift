@@ -73,7 +73,11 @@ final class FeedPaginationTests: XCTestCase {
         XCTAssertEqual(client.posts.count, 10)
         XCTAssertEqual(client.moreError, "offline")
         XCTAssertNil(client.lastFeedBatch)
-        await client.morePosts(count: 5)
+        XCTAssertEqual(client.feedRetryCount, 5)
+        // Returning to a cached feed must restore the failed choice rather than
+        // the view's default. Retry remains the original five-post action.
+        await client.load(.feed)
+        await client.morePosts(count: client.feedRetryCount)
         XCTAssertEqual(client.posts.map(\.id), posts(1...15).map(\.id))
         XCTAssertEqual(transport.counts, [10, 2, 2])
         XCTAssertNil(client.moreError)

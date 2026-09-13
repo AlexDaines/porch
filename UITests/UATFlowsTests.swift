@@ -1,6 +1,20 @@
 import XCTest
 
 final class UATFlowsTests: XCTestCase {
+    @MainActor func testFailedFivePostChoiceSurvivesLeavingFeedBeforeRetry() {
+        let app = fixture(extra: ["--uat-feed-choice", "--uat-feed-retry"])
+        let more = app.buttons["feed-more-posts"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap(); app.buttons["Up to 5 posts"].tap()
+        XCTAssertTrue(app.staticTexts["You're offline. Connect and try again."].waitForExistence(timeout: 5))
+        app.buttons["tab-Messages"].tap()
+        XCTAssertTrue(app.staticTexts["UAT fixture"].waitForExistence(timeout: 5))
+        app.buttons["tab-Feed"].tap()
+        let retry = app.buttons["TRY AGAIN"]
+        XCTAssertTrue(retry.waitForExistence(timeout: 5)); retry.tap()
+        reachFeedBoundary(app, target: more, count: 6)
+        XCTAssertEqual(app.staticTexts["feed-loaded-count"].label, "6 posts loaded", "Returning to the feed must preserve the chosen five, not a view-local default")
+    }
     @MainActor func testFeedChoiceLoadsOnlyOnSelectionAndRetainsOverflow() {
         let app = fixture(extra: ["--uat-feed-choice"])
         let more = app.buttons["feed-more-posts"]

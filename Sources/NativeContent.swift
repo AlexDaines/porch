@@ -32,13 +32,13 @@ struct NativeFeed: View {
     var more: ((Int) -> Void)?
     var batchOptions = [5, 10, 20]
     var lastBatch: InstagramDataClient.FeedBatch?
+    var retryCount = 10
     var moreLoading = false
     var refreshing = false
     var moreError: String?
     var reachedSessionLimit = false
     var refresh: (() async -> Void)?
     @Environment(\.porchAccent) private var accent
-    @State private var lastChoice = 10
     var body: some View {
         ScrollViewReader { proxy in
         ScrollView {
@@ -50,7 +50,7 @@ struct NativeFeed: View {
                 }
                 if let moreError, let more, moreError != "signIn" {
                     LoadFailure(code:moreError,retry:{
-                        if ["unavailable","unsupported"].contains(moreError) { Task { await refresh?() } } else { more(lastChoice) }
+                        if ["unavailable","unsupported"].contains(moreError) { Task { await refresh?() } } else { more(retryCount) }
                     },actionTitle:["unavailable","unsupported"].contains(moreError) ? "RELOAD FEED" : nil)
                 }
                 VStack(spacing: 4) {
@@ -62,7 +62,6 @@ struct NativeFeed: View {
                         Menu {
                             ForEach(batchOptions, id: \.self) { amount in
                                 Button("Up to \(amount) \(amount == 1 ? "post" : "posts")") {
-                                    lastChoice = amount
                                     more(amount)
                                 }.accessibilityIdentifier("feed-load-\(amount)")
                             }

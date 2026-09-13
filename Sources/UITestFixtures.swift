@@ -24,6 +24,7 @@ extension InstagramDataClient {
 private final class UITestTransport: InstagramTransport {
     private var feedLoads = 0
     private var feedPages = 0
+    private var feedFailureDelivered = false
     private var delayedReconciliation = false
     private var messages = [InstagramMessage(id:"1",text:"A fictional conversation for UAT checks.",mine:false)]
     func execute(_ operation:String,identifier:String,text:String,context:String,feedCount:Int = 10) async throws -> InstagramDataResult {
@@ -38,6 +39,10 @@ private final class UITestTransport: InstagramTransport {
             if feedLoads > 1 { return .init(error:"offline") }
             return .init(posts:[.init(id:"1",username:"uat.fixture",caption:"Fictional post retained during a failed refresh.",timestamp:1,media:[])])
         case "moreFeed":
+            if ProcessInfo.processInfo.arguments.contains("--uat-feed-retry"), !feedFailureDelivered {
+                feedFailureDelivered = true
+                return .init(error: "offline")
+            }
             feedPages += 1
             guard ProcessInfo.processInfo.arguments.contains("--uat-feed-choice") else { return .init() }
             // Deliberately larger than the first choice, then a short final page.
