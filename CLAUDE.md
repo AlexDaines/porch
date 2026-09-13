@@ -1,1 +1,3 @@
-Read AGENTS.md for this app's architecture, constraints and verification rules.
+Maintainer and constitutional-review guidance: read [CONSTITUTION.md](CONSTITUTION.md) for Porch's canonical principles and versioned review/amendment contract, then [AGENTS.md](AGENTS.md) for architecture, implementation constraints and verification rules. Constitutional findings must cite the pinned charter revision, an article ID and evidence; personal preferences are proposals.
+
+Blind UI participants must use an isolated context that does not load this file, AGENTS.md, the constitution, design rationale or staff/reference material. Their sealed task and permitted UI access remain separate from constitutional review (PORCH-10).
