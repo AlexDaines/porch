@@ -1,5 +1,7 @@
 # Design
 
+[CONSTITUTION.md](CONSTITUTION.md) is Porch's canonical versioned statement of purpose, user commitments and review discipline. This document records the current implementation choices and the rationale behind them. Colors, type scales, layouts and batch sizes can evolve under those commitments; a constitutional review must cite the pinned charter's articles and evidence. Blind UI participants must not receive either document (PORCH-10).
+
 Porch serves people who already know Instagram and want less stimulation. Its content is fully custom, native SwiftUI. The visual reference is Plural, the moped travel-time app, and its Horse Weapons style: black canvas, warm bone text, warm gray details, thin rules and a personal accent for active controls. One compact control row selects Feed, Stories or Messages. Explanations belong in Settings.
 
 Monospaced utility labels and the short selection underline come from Plural's controls. Names and captions retain readable system typography, with the author above the media and the caption below. Entry screens, control groups and sheet titles are centered. Reading paragraphs retain 20-point text margins; photos can span the screen. The navigation stacks at large text sizes instead of truncating its labels. No extra masthead or decorative panels compete with the content. A quiet loaded count appears only at the feed's natural pause.
@@ -29,6 +31,8 @@ The system launch screen uses an explicit black color asset and dark appearance,
 **Feed and Stories are separate destinations.** No story tray in Feed, no posts under Stories, no simultaneous streams. A story opens only after selecting a followed person. Advancement and video playback require a deliberate action. Pagination is a button, not an infinite-scroll trigger. The current session caches each tab until explicitly refreshed.
 
 ## Deliberate feed batches
+
+This design implements PORCH-01 through PORCH-04: informed consent without shame, factual awareness, and the user's control over loading and stopping.
 
 Awareness supports informed choice. Porch reports what it has made available without rewarding extra consumption or treating stopping as failure. There are no pressure timers, guilt cues, streaks, subscriptions or new behavioral analytics. “N posts loaded” counts the posts currently available in the visible feed, not posts read or seen; pending records are not included. This count resets on successful refresh or session end and is not a usage history.
 

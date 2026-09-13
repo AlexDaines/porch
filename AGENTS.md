@@ -1,5 +1,11 @@
 # Working on Porch
 
+Maintainers and constitutional reviewers must read [CONSTITUTION.md](CONSTITUTION.md), Porch's canonical versioned commitments, before proposing, implementing or reviewing a change. Pin its version, immutable Git revision and content hash for constitutional review; cite stable article IDs with evidence. Design preferences outside it are proposals, while explicit task requirements are assessed separately. Amendments follow PORCH-11. These implementation notes and DESIGN.md are derived guidance, not alternate constitutions.
+
+The charter's silence does not suppress substantiated correctness, security, safety, accessibility or user-requirement findings: cite their actual authority and evidence separately (PORCH-09). Routine reversible implementation choices need no constitutional approval, and existing owner authorization must not be requested again (PORCH-11).
+
+Blind UI participants must run in isolated contexts without this file, CLAUDE.md, the constitution, design rationale or staff/reference material. Provide their sealed task and permitted interface access only. Constitutional reviewers receive the pinned charter separately; exposure invalidates a blinded claim. See PORCH-09 and PORCH-10.
+
 Keep Porch minimal through restraint, spacing and quiet controls, not tiny text. The user rejected the previous 13/12/11-point scale and left-aligned entry screens. Use 17-point body/title text, 15-point details and monospaced utilities, and 22-point onboarding headings, all responsive to Dynamic Type. Center the introduction, entry actions, color picker, navigation group and sheet titles. Keep reading paragraphs and conversation sender alignment natural. Swatches are 28-point squares inside 44-point tap targets; default avatars are 32 points. Avoid full-width filled entry buttons and decorative panels.
 
 All Porch interface shapes have sharp corners. Color swatches and their selection outlines are squares, as are story avatars; media, buttons, text fields and presentation surfaces have no rounding. Use porchSheet() for app sheets, plain controls and inline confirmations. Do not introduce circles, capsules, rounded cards or default toolbar button backgrounds. Instagram's authentication page and OS-owned interfaces retain their own controls.
