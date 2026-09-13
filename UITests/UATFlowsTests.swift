@@ -54,6 +54,8 @@ final class UATFlowsTests: XCTestCase {
         XCTAssertTrue(target.exists && target.isHittable, "The feed boundary must remain reachable")
     }
     @MainActor private func snapshot(_ name: String) {
+        // Let the native menu compositor settle before preserving a review image.
+        Thread.sleep(forTimeInterval: 1)
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
     }
